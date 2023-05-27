@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Literal
 import re
 
 import requests
@@ -81,6 +81,26 @@ class Repo:
 
     def workflow(self, filename: str) -> URL:
         return self.url / f'actions/workflows/{filename}'
+
+    def pr_issues(self, pr: bool = True, closed: Optional[bool] = None, label: Optional[str] = None) -> URL:
+        url = self.url / ('pulls' if pr else 'issues')
+        if closed is None and label is None:
+            return url
+        url.queries['q'] = 'is' + ('pr' if pr else 'issue')
+        if closed is not None:
+            url.queries['q'] += f'+is:{"closed" if closed else "open"}'
+        if label is not None:
+            url.queries['q'] += f'+label:{label}'
+        url.quote_safe = '+'
+        return url
+
+    def releases(self, tag: Optional[str | Literal['latest']] = None) -> URL:
+        base_url = self.url / 'releases'
+        if not tag:
+            return base_url
+        if tag == 'latest':
+            return base_url / 'latest'
+        return base_url / 'tag' / tag
 
 
 class Branch:
