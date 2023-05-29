@@ -1,83 +1,97 @@
+"""GitHub URLs."""
+
+
 from typing import Optional, Literal
 import re
 
 import requests
 
-from pylinks import OFFLINE_MODE as _OFFLINE_MODE
+import pylinks
 from pylinks import URL
 
 
-URL_BASE = URL(base='https://github.com')
+BASE_URL = URL(base='https://github.com')
 
 
 class User:
+    """GitHub user."""
+
     def __init__(self, username: str, validate: Optional[bool] = None):
+        """
+        Parameters
+        ----------
+        username : str
+            GitHub username.
+        validate : bool
+            Whether to validate online that the given username exists.
+        """
         if not isinstance(username, str):
             raise TypeError(f"`name` must be a string, not {type(username)}.")
         if re.match(r'^[A-Za-z0-9-]+$', username) is None:
             raise ValueError('GitHub usernames can only contain alphanumeric characters and dashes.')
         self._username = username
-        self._url = URL_BASE / username
-        if validate is True or (validate is None and not _OFFLINE_MODE):
+        if validate is True or (validate is None and not pylinks.OFFLINE_MODE):
             requests.get(str(self.url)).raise_for_status()
         return
-
-    @property
-    def username(self) -> str:
-        return self._username
-
-    @property
-    def url(self) -> URL:
-        return self._url
 
     def __str__(self):
         return str(self.url)
 
     def __repr__(self):
-        return f"User(username='{self.username}')"
+        return f"GitHub-User: {self.name} @ {self.url}"
 
-    def repo(self, repo_name: str, validate: Optional[bool] = None):
+    @property
+    def name(self) -> str:
+        """GitHub username."""
+        return self._username
+
+    @property
+    def url(self) -> URL:
+        """URL of the GitHub user's main page."""
+        return BASE_URL / self.name
+
+    def repo(self, repo_name: str, validate: Optional[bool] = None) -> 'Repo':
+        """A repository of the user."""
         return Repo(user=self, repo_name=repo_name, validate=validate)
 
 
-def user(username: str, validate: Optional[bool] = None) -> User:
-    return User(username=username, validate=validate)
-
-
 class Repo:
-    def __init__(self, user: User, repo_name: str, validate: Optional[bool] = None):
-        if not isinstance(user, User):
-            raise TypeError("`user` must be a User instance.")
+    def __init__(self, user: User | str, repo_name: str, validate: Optional[bool] = None):
+        if isinstance(user, str):
+            self._user = User(username=user, validate=validate)
+        elif isinstance(user, User):
+            self._user = user
+        else:
+            raise TypeError(f"`user` must be a User instance or a username as string, not {type(user)}.")
         self._user = user
         if not isinstance(repo_name, str):
-            raise TypeError("`name` must be a string.")
+            raise TypeError("`repo_name` must be a string.")
         self._repo_name = repo_name
         if re.match(r'^[A-Za-z0-9_.-]+$', repo_name) is None:
             raise ValueError(
                 'GitHub repository names can only contain "_", "-", ".", and alphanumeric characters.'
             )
-        self._url = self.user.url / repo_name
-        if validate is True or (validate is None and not _OFFLINE_MODE):
+        if validate is True or (validate is None and not pylinks.OFFLINE_MODE):
             requests.get(str(self.url)).raise_for_status()
         return
-
-    @property
-    def url(self) -> URL:
-        return self._url
 
     def __str__(self):
         return str(self.url)
 
     def __repr__(self):
-        return f"Repo(user=User(username='{self.user.username}'), repo_name='{self.repo_name}')"
+        return f"GitHub-Repo: {self.name} by {self.user.name} @ {self.url}"
 
     @property
     def user(self) -> User:
         return self._user
 
     @property
-    def repo_name(self) -> str:
+    def name(self) -> str:
         return self._repo_name
+
+    @property
+    def url(self) -> URL:
+        return self.user.url / self.name
 
     def workflow(self, filename: str) -> URL:
         return self.url / f'actions/workflows/{filename}'
@@ -102,6 +116,27 @@ class Repo:
             return base_url / 'latest'
         return base_url / 'tag' / tag
 
+    @property
+    def commits(self) -> URL:
+        return self.url / 'commits'
+
+    def discussions(self, category: Optional[str]) -> URL:
+        url = self.url / 'discussions'
+        if category:
+            url /= f'categories/{category}'
+        return url
+
+    def milestones(self, state: Literal['open', 'closed'] = 'open'):
+        url = self.url / 'milestones'
+        if state:
+            url.queries['state'] = state
+        return url
+
+
+    def branch(self, branch_name: str, validate: Optional[bool] = None) -> 'Branch':
+        """A branch of the Repository"""
+        return Branch(repo=self, branch_name=branch_name, validate=validate)
+
 
 class Branch:
     def __init__(self, repo: Repo, branch_name: str, validate: Optional[bool] = None):
@@ -116,7 +151,7 @@ class Branch:
                 'GitHub branch names can only contain "_", "-", ".", and alphanumeric characters.'
             )
         self._url = self.repo.url / 'tree' / branch_name
-        if validate is True or (validate is None and not _OFFLINE_MODE):
+        if validate is True or (validate is None and not pylinks.OFFLINE_MODE):
             requests.get(str(self.url)).raise_for_status()
         return
 
@@ -125,11 +160,11 @@ class Branch:
         return self._repo
 
     @property
-    def url(self):
+    def url(self) -> URL:
         return self._url
 
     @property
-    def branch_name(self):
+    def branch_name(self) -> str:
         return self._branch_name
 
     def workflow(self, filename: str) -> URL:
@@ -138,3 +173,15 @@ class Branch:
             'query': f'branch:{self.branch_name}'
         }
         return url
+
+    def file(self, filename: str) -> URL:
+        return self.url / filename
+
+    @property
+    def commits(self) -> URL:
+        return self.repo.url / 'commits' / self.branch_name
+
+
+def user(username: str, validate: Optional[bool] = None) -> User:
+    return User(username=username, validate=validate)
+
