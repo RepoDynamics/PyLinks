@@ -1,19 +1,19 @@
-"""Create, modify and manage URLs."""
+""""""
 
-
+from typing import Optional
 import urllib
 import re
 
 
 class URL:
-    """A URL with a base address and optional queries."""
+    """A URL with a base address, and optional queries and fragment."""
 
     def __init__(
             self, base: str,
-            queries: dict[str, str] = None,
-            fragment: str = None,
+            queries: Optional[dict[str, str | bytes | None]] = None,
+            fragment: Optional[str] = None,
+            quote_safe: Optional[str] = '',
             query_delimiter: str = '&',
-            quote_safe: str = ''
     ):
         """
         Parameters
@@ -21,8 +21,18 @@ class URL:
         base : str
             The base URL, e.g. 'https://example.com/index'.
             It must start with either 'https://' or 'http://'.
-        queries : dict[str, str], optional
-            Query fields as a dictionary of key-value pairs, e.g. `{'title': 'my-title'}`.
+        queries : dict[str, str | has_str | bytes | None], optional
+            Optional query fields as a dictionary of key-value pairs, e.g. `{'title': 'my-title'}`.
+            The values can be strings, or objects that implement the __str__ method.
+            Alternatively, they can be bytes, in which case the content will be decoded using UTF-8, but not quoted.
+            If the value is None, only the key will be included in the query string.
+        fragment : str, optional
+            Optional fragment at the end of URL, i.e. after the '#' symbol.
+        quote_safe : str, default: ''
+            Characters that should not be quoted in the URL.
+            For more control, query values that should not be quoted at all can be passed as bytes.
+        query_delimiter : str, default: '&'
+            Delimiter for the query string.
         """
         self.base, base_queries, base_fragment = self._process_url(base)
         self.queries = base_queries | queries if queries else base_queries
@@ -41,15 +51,19 @@ class URL:
         return url
 
     def __truediv__(self, path):
+        """
+        Add a path at the end of the base URL (while preserving the query string and fragment),
+        and return a new copy.
+        """
         if not isinstance(path, str):
-            raise TypeError("Addition can only be performed on strings.")
+            raise TypeError("Adding a path can only be performed on strings.")
         if path.startswith('/'):
             path = path[1:]
         if path.endswith('/'):
             path = path[:-1]
         return URL(
             base=f'{self.base}/{path}',
-            queries=self.queries,
+            queries=self.queries.copy(),
             fragment=self.fragment,
             query_delimiter=self.query_delimiter,
             quote_safe=self.quote_safe
@@ -73,16 +87,29 @@ class URL:
         )
 
     @property
-    def query_string(self) -> str:
+    def query_string(self) -> str | None:
         """The complete query string, e.g. 'title=my-title&style=bold'"""
-        return self.query_delimiter.join(
-            [
-                f'{urllib.parse.quote(str(key), safe="")}={urllib.parse.quote(str(val), safe=self.quote_safe)}'
-                for key, val in self.queries.items() if val is not None
-            ]
-        ) if self.queries else None
+        if not self.queries:
+            return
+        queries = []
+        for key, val in self.queries.items():
+            if val is None:
+                continue
+            q_key = urllib.parse.quote(str(key), safe=self.quote_safe)
+            if isinstance(val, bool) and val is True:
+                queries.append(q_key)
+            else:
+                q_val = val.decode("utf8") if isinstance(val, bytes) else urllib.parse.quote(
+                    str(val), safe=self.quote_safe
+                )
+                queries.append(f'{q_key}={q_val}')
+        return self.query_delimiter.join(queries)
 
-    def add_path(self, path: str):
+    def add_path(self, path: str) -> None:
+        """
+        Add a path to the end of the base URL, while preserving the query string and fragment.
+        This modifies the current instance in place.
+        """
         if path.startswith('/'):
             path = path[1:]
         if path.endswith('/'):
@@ -90,11 +117,11 @@ class URL:
         self.base += f'/{path}'
         return
 
-    def copy(self):
+    def copy(self) -> 'URL':
+        """Create a new copy."""
         return self.__copy__()
 
-    @staticmethod
-    def _process_url(url: str) -> tuple[str, dict[str, str], str]:
+    def _process_url(self, url: str) -> tuple[str, dict[str, str], str]:
         """
         Process a URL and separate the base, query string and fragment.
 
@@ -109,12 +136,16 @@ class URL:
         """
 
         def _process_query_string(query_string: str):
+            """Process the query string and return a dictionary of key-value pairs."""
             queries = dict()
-            for query in query_string.split('&'):
+            for query in query_string.split(self.query_delimiter):
                 key_val = query.split('=')
-                if len(key_val) != 2:
+                if len(key_val) == 1:
+                    queries[key_val[0]] = True
+                elif len(key_val) == 2:
+                    queries[key_val[0]] = key_val[1]
+                else:
                     raise ValueError("Query string not formatted correctly.")
-                queries[key_val[0]] = key_val[1]
             return queries
 
         if not url.startswith(("http://", "https://")):
