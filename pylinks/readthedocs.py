@@ -1,25 +1,52 @@
+"""URLs for ReadTheDocs websites."""
 
 from typing import Optional
 import requests
 
-from pylinks import OFFLINE_MODE as _OFFLINE_MODE
-from pylinks import URL
+import pylinks
+from pylinks import url
+from pylinks.url import URL
 
 
-class ReadTheDocs:
+BASE_URL = url(url='https://readthedocs.org')
 
-    URL_BASE = URL(base='https://readthedocs.org')
 
-    def __init__(self, project: str, validate: Optional[bool] = None):
-        if not isinstance(project, str):
-            raise TypeError(f"`project` must be a string, not {type(project)}.")
-        self.project = project
-        self.project_url = self.URL_BASE / f'projects/{project}'
-        if validate is True or (validate is None and not _OFFLINE_MODE):
-            requests.get(str(self.project_url)).raise_for_status()
-        self.website_url = URL(base=f'https://{project}.readthedocs.io')
+class Project:
+    """A ReadTheDocs website project."""
+
+    def __init__(self, name: str, validate: Optional[bool] = None):
+        """
+        Parameters
+        ----------
+        name : str
+            Name of the project.
+        validate : bool, default: None
+            Whether to validate the URL online (requires an active internet connection).
+            If set to None (default), the global default value defined in `pylinks.OFFLINE_MODE` is used.
+        """
+        if not isinstance(name, str):
+            raise TypeError(f"`name` must be a string, not {type(name)}.")
+        self._name = name
+        if validate is True or (validate is None and not pylinks.OFFLINE_MODE):
+            requests.get(str(self.project_home)).raise_for_status()
         return
 
     @property
-    def build_status_url(self):
-        return self.project_url / 'builds'
+    def name(self) -> str:
+        """Name of the project."""
+        return self._name
+
+    @property
+    def project_home(self) -> URL:
+        """URL of the project's homepage. This is not the homepage of the website."""
+        return BASE_URL / 'projects' / self.name
+
+    @property
+    def build_status(self) -> URL:
+        """URL of the webpage showing an overview of the website's build status."""
+        return self.project_home / 'builds'
+
+    @property
+    def homepage(self) -> URL:
+        """URL of the website's homepage."""
+        return url(f'https://{self.name}.readthedocs.io')

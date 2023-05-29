@@ -1,13 +1,18 @@
-"""PyLinks: Create, Modify and Manage URLs.
+"""PyLinks: Create, Modify and Manage URLs in Python.
 
 PyLinks implements a URL object, making it easy to manipulate and work with URLs.
 It also offers a number of URL generators for popular online platforms
 such as GitHub, PyPI, Anaconda, ReadTheDocs etc., allowing for facile and dynamic
-creation of many useful URLs.
+creation of many useful links.
+
+To create a URL, use the `url` function; it is located in the `url` module,
+but can be used directly from the root. It returns a URL object, also defined in the `url` module.
+
+Other available modules offer shortcuts for creating useful URLs for popular online services.
 """
 
 
-from .url import URL
+from .url import url
 from . import binder, conda, github, pypi, readthedocs
 
 
