@@ -261,8 +261,10 @@ class Branch:
         }
         return url
 
-    def file(self, filename: str) -> URL:
+    def file(self, filename: str, raw: bool = False) -> URL:
         """URL of a specific file in the branch."""
+        if raw:
+            return url('https://raw.githubusercontent.com') / self.repo.user.name / self.repo.name / self.name / filename
         return self.homepage / filename
 
     @property
