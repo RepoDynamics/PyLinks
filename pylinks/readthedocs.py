@@ -50,3 +50,10 @@ class Project:
     def homepage(self) -> URL:
         """URL of the website's homepage."""
         return url(f'https://{self.name}.readthedocs.io')
+
+
+def project(
+        name: str,
+        validate: Optional[bool] = None,
+):
+    return Project(name=name, validate=validate)
