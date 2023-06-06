@@ -138,7 +138,7 @@ class Repo:
         if closed is None and label is None:
             return url
         url.quote_safe = '+'
-        url.queries['q'] = 'is' + ('pr' if pr else 'issue')
+        url.queries['q'] = f"is:{'pr' if pr else 'issue'}"
         if closed is not None:
             url.queries['q'] += f'+is:{"closed" if closed else "open"}'
         if label is not None:
