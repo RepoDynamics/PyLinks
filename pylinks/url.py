@@ -37,7 +37,7 @@ class URL:
             Delimiter for the query string.
         """
         self.base = base
-        self.queries = queries
+        self.queries = queries or dict()
         self.fragment = fragment
         self.query_delimiter = query_delimiter
         self.quote_safe = quote_safe
