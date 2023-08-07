@@ -11,11 +11,7 @@ but can be used directly from the root. It returns a URL object, also defined in
 Other available modules offer shortcuts for creating useful URLs for popular online services.
 """
 
-OFFLINE_MODE: bool = False
-"""Global variable to set whether URL generators should verify the created URLs online."""
-
-
+from ._settings import settings
 from .url import url
-from . import binder, conda, github, pypi, readthedocs
 from .http import request
-
+from . import api, site
