@@ -5,7 +5,9 @@ run-name: 'Package: Build from ${{github.ref}}'
 
 on:
   workflow_dispatch:
-
+  push:
+    paths:
+      - 'pyproject.toml'
 
 jobs:
 
