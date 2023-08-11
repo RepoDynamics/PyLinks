@@ -107,8 +107,8 @@ class DOI:
         )
         date = self._get_date(data)
         curated = {
-            "doi": doi,
-            "url": f"https://doi.org/{doi}",
+            "doi": self.doi,
+            "url": f"https://doi.org/{self.doi}",
             "type": data["type"],  # e.g. 'journal-article', 'posted-content'
             "subtype": data.get("subtype"),  # e.g. 'preprint' for 'posted-content' type
             "cite": {
