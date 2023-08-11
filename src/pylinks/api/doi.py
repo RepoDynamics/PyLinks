@@ -1,5 +1,7 @@
 # Standard libraries
 import re
+import unicodedata
+import datetime
 from typing import Optional
 
 # Non-standard libraries
@@ -89,6 +91,83 @@ class DOI:
             encoding="utf-8",
             response_type="json",
         )
+
+    @property
+    def curated(self):
+        data = self.citeproc_dict
+        journal = data["container-title"] or None
+        journal_abbr = (
+            (
+                data.get("container-title-short") or pylinks.request(
+                f"https://abbreviso.toolforge.org/abbreviso/a/{journal}",
+                    response_type="str",
+                ).title()
+            )
+            if journal else None
+        )
+        date = self._get_date(data)
+        curated = {
+            "doi": doi,
+            "url": f"https://doi.org/{doi}",
+            "type": data["type"],  # e.g. 'journal-article', 'posted-content'
+            "subtype": data.get("subtype"),  # e.g. 'preprint' for 'posted-content' type
+            "cite": {
+                "BibTex": self.bibtex,
+                "RIS": self.ris,
+            },  # bibtex citation string
+            "journal": journal,  # journal name
+            "journal_abbr": journal_abbr,  # journal abbreviation
+            "publisher": data.get("publisher"),  # publisher name
+            "title": data.get("title"),  # title of the publication
+            "pages": data.get("page"),  # page numbers
+            "volume": data.get("volume"),  # volume number
+            "issue": data.get("issue"),  # issue number
+            "date_tuple": date,  # tuple of (year, month, day)
+            "year": date[0],
+            "date": datetime.date(*date).strftime("%e %B %Y").lstrip(),
+            "abstract": self.jats_to_html(data["abstract"]) if data.get("abstract") else None,
+        }
+        return curated
+
+    @staticmethod
+    def jats_to_html(string):
+        convert = {
+            r"<jats:sub>(.*?)</jats:sub>": r"<sub>\1</sub>",
+        }
+        norm = unicodedata.normalize("NFKC", string)
+        paragraph_match = re.search("<jats:p>(.*?)</jats:p>", norm)
+        paragraph = paragraph_match.group(1) if paragraph_match else norm
+        for pattern, repl in convert.items():
+            paragraph = re.sub(pattern, repl, paragraph)
+        return paragraph
+
+    @staticmethod
+    def _get_date(data):
+        year = None
+        month = None
+        day = None
+        for choice in (
+                "pubished",
+                "published-online",
+                "published-print",
+                "published-other",
+                "issued",
+                "created",
+                "deposited",
+                "indexed",
+        ):
+            if year and month and day:
+                break
+            date = data.get(choice, dict()).get("date-parts", [None])[0]
+            if date:
+                year = year or date[0]
+                if not month:
+                    if len(date) == 2:
+                        month = date[1]
+                    if len(date) == 3:
+                        month = date[1]
+                        day = date[2]
+        return year, month or 1, day or 1
 
 
 def doi(doi: str) -> DOI:

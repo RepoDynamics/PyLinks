@@ -99,7 +99,6 @@ class Repo:
         tags = self.tag_names(pattern=rf"^{tag_prefix}(\d+\.\d+\.\d+)$")
         return sorted([tuple(map(int, tag[0].split("."))) for tag in tags])
 
-
     def discussion_categories(self, access_token: str) -> list[dict[str, str]]:
         """Get discussion categories for a repository.
 
