@@ -203,15 +203,3 @@ class Repo:
             for entry in response["data"]["repository"]["discussionCategories"]["edges"]
         ]
         return discussions
-
-
-def github(token: Optional[str] = None) -> GitHub:
-    return GitHub(token=token)
-
-
-def user(username: str, token: Optional[str] = None) -> User:
-    return User(username=username, token=token)
-
-
-def repo(username: str, name: str, token: Optional[str] = None) -> Repo:
-    return Repo(username=username, name=name, token=token)

@@ -5,7 +5,7 @@ import datetime
 from typing import Optional
 
 # Non-standard libraries
-import pylinks
+from pylinks.http import request as _request
 
 
 class DOI:
@@ -58,13 +58,13 @@ class DOI:
             accept += f"; style={style}"
         if locale:
             accept += f"; locale={locale}"
-        return pylinks.request(
+        return _request(
             self.url, headers={"accept": accept}, encoding="utf-8", response_type="str"
         )
 
     @property
     def bibtex(self) -> str:
-        return pylinks.request(
+        return _request(
             self.url,
             headers={"accept": "application/x-bibtex"},
             encoding="utf-8",
@@ -73,7 +73,7 @@ class DOI:
 
     @property
     def ris(self) -> str:
-        return pylinks.request(
+        return _request(
             self.url,
             headers={"accept": "application/x-research-info-systems"},
             encoding="utf-8",
@@ -85,7 +85,7 @@ class DOI:
         """
         Citation data as a dictionary with Citeproc JSON schema.
         """
-        return pylinks.request(
+        return _request(
             self.url,
             headers={"accept": "application/citeproc+json"},
             encoding="utf-8",
@@ -98,7 +98,7 @@ class DOI:
         journal = data["container-title"] or None
         journal_abbr = (
             (
-                data.get("container-title-short") or pylinks.request(
+                data.get("container-title-short") or _request(
                 f"https://abbreviso.toolforge.org/abbreviso/a/{journal}",
                     response_type="str",
                 ).title()
@@ -168,7 +168,3 @@ class DOI:
                         month = date[1]
                         day = date[2]
         return year, month or 1, day or 1
-
-
-def doi(doi: str) -> DOI:
-    return DOI(doi=doi)

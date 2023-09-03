@@ -40,7 +40,3 @@ class Orcid:
             else:
                 warnings.warn(f"Could not find DOI for work {work}.")
         return self._dois
-
-
-def orcid(orcid_id: str) -> Orcid:
-    return Orcid(orcid_id=orcid_id)
