@@ -36,6 +36,10 @@ class GitHub:
             response_type="json"
         )
 
+    @property
+    def authenticated(self) -> bool:
+        return self._token is not None
+
 
 class User:
     def __init__(self, username: str, token: Optional[str] = None):
