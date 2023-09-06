@@ -125,8 +125,8 @@ class Repo:
                 full_download_path = download_path / full_filepath
             else:
                 rel_path = (
-                    full_filepath.name if full_filepath == download_path
-                    else full_filepath.relative_to(download_path)
+                    full_filepath.name if full_filepath == path
+                    else full_filepath.relative_to(path)
                 )
                 full_download_path = download_path / rel_path
             full_download_path.parent.mkdir(parents=True, exist_ok=True)
