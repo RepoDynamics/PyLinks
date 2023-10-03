@@ -207,3 +207,6 @@ class Repo:
             for entry in response["data"]["repository"]["discussionCategories"]["edges"]
         ]
         return discussions
+
+    def issue(self, number: int) -> dict:
+        return self._rest_query(f"issues/{number}")
