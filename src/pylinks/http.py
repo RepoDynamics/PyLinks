@@ -29,7 +29,6 @@ __author__ = "Armin Ariamajd"
 
 class WebAPIError(IOError):
     """Base Exception class for all web API exceptions."""
-
     pass
 
 
@@ -46,15 +45,21 @@ class WebAPIStatusCodeError(WebAPIError):
         # This part is adapted from `requests` library; See PR #3538 on their GitHub
         if isinstance(response.reason, bytes):
             try:
-                reason = response.reason.decode("utf-8")
+                self.reason = response.reason.decode("utf-8")
             except UnicodeDecodeError:
-                reason = response.reason.decode("iso-8859-1")
+                self.reason = response.reason.decode("iso-8859-1")
         else:
-            reason = response.reason
+            self.reason = response.reason
+        self.response_msg = response.text
+        self.side = "client" if response.status_code < 500 else "server"
+        self.status_code = response.status_code
+        self.url = response.url
+
         error_msg = (
-            f"HTTP {'client' if response.status_code < 500 else 'server'} error "
-            f"(status code: {response.status_code}) from {response.url}: {reason}\n"
-            f"HTTP response: {response.text}"
+            f"HTTP {self.side} error (status code: {self.status_code})\n"
+            f"- From: {self.url}\n"
+            f"- Reason: {self.reason}\n"
+            f"- Response: {self.response_msg}"
         )
         super().__init__(error_msg)
         return
