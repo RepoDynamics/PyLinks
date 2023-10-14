@@ -2,9 +2,7 @@
 Handling HTTP requests and responses.
 """
 
-
-# Standard libraries
-# Standard library
+from pathlib import Path
 from typing import (
     Any,
     Callable,
@@ -18,8 +16,6 @@ from typing import (
     Union,
 )
 
-# Non-standard libraries
-# 3rd-party
 import requests
 from ._decorator import RetryConfig, retry_on_exception
 
@@ -330,3 +326,44 @@ def request(
     )
     # Call the (decorated or non-decorated) response-value function and return.
     return response_val_func()
+
+
+def download(url: str, filepath: str | Path, create_dirs: bool = True, overwrite: bool = False) -> Path:
+    """
+    Download a file from a URL to a local path.
+
+    Parameters
+    ----------
+    url : str
+        URL of the file to download.
+    filepath : str | Path
+        Local path to save the downloaded file.
+    create_dirs : bool, optional, default: True
+        Whether to create directories in the local path if they do not exist.
+    overwrite : bool, optional, default: False
+        Whether to overwrite an existing file in the local path.
+
+    Returns
+    -------
+    pathlib.Path
+        Path to the downloaded file.
+
+    Raises
+    ------
+    FileExistsError
+        If `overwrite` is False and the file already exists.
+    """
+    filepath = Path(filepath).resolve()
+    if filepath.exists():
+        if filepath.is_dir():
+            raise ValueError(f"Filepath {filepath} is a directory.")
+        if not overwrite:
+            raise FileExistsError(f"File {filepath} already exists.")
+    if not filepath.parent.exists():
+        if not create_dirs:
+            raise FileNotFoundError(f"Directory {filepath.parent} does not exist.")
+        filepath.parent.mkdir(parents=True, exist_ok=True)
+    content = request(url=url, response_type="bytes")
+    with open(filepath, "wb") as f:
+        f.write(content)
+    return filepath
