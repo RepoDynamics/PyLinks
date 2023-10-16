@@ -474,7 +474,7 @@ class Repo:
             raise ValueError("At least one of 'new_name', 'color', or 'description' must be specified.")
         return self._rest_query(query=f"labels/{name}", verb="PATCH", data=data)
 
-    def
+
 
     @staticmethod
     def _validate_label_data(name: str, color: str, description: str):
