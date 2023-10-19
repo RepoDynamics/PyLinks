@@ -151,6 +151,10 @@ class Repo:
             url.queries["q"] += f"+label:{label}"
         return url
 
+    def commit(self, commit_hash: str) -> URL:
+        """URL of a specific commit in the repository."""
+        return self.homepage / "commit" / commit_hash
+
     def releases(self, tag: Optional[str | Literal["latest"]] = None) -> URL:
         """
         URL of the releases overview page, or a specific release.

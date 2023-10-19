@@ -387,6 +387,28 @@ class Repo:
     def issue_comment_update(self, comment_id: int, body: str) -> dict:
         return self._rest_query(f"issues/comments/{comment_id}", verb="PATCH", data={"body": body})
 
+    def pull_create(
+        self,
+        head: str,
+        base: str,
+        title: str = "",
+        issue: int = 0,
+        body: str = "",
+        maintainer_can_modify: bool = True,
+        draft: bool = False,
+        head_repo: str = ""
+    ) -> dict:
+        data = {"head": head, "base": base, "maintainer_can_modify": maintainer_can_modify, "draft": draft}
+        if issue:
+            data["issue"] = issue
+        if title:
+            data["title"] = title
+        if body:
+            data["body"] = body
+        if head_repo:
+            data["head_repo"] = head_repo
+        return self._rest_query(query="pulls", verb="POST", data=data)
+
     def update_settings(self, settings: dict):
         """For settings, see https://docs.github.com/en/rest/reference/repos#update-a-repository-settings"""
         return self._rest_query(verb="PATCH", data=settings)
