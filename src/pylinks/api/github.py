@@ -133,6 +133,25 @@ class Repo:
 
     @property
     def labels(self) -> list[dict]:
+        """
+        List of all labels for the repository.
+
+        Returns
+        -------
+        A list of dictionaries with following keys:
+
+        id : int, example: 208045946
+        node_id: str, example: MDU6TGFiZWwyMDgwNDU5NDY=
+        url: str, example: https://api.github.com/repos/username/repo/labels/bug
+        name: str, example: bug
+        description: str, example: Something isn't working
+        color: str, example: FFFFFF
+        default: bool, example: True
+
+        References
+        ----------
+        - [GitHub Docs](https://docs.github.com/en/rest/issues/labels?apiVersion=2022-11-28#list-labels-for-a-repository)
+        """
         labels = []
         page = 1
         while True:
