@@ -340,6 +340,47 @@ class Repo:
     def issue(self, number: int) -> dict:
         return self._rest_query(f"issues/{number}")
 
+    def issue_update(
+        self,
+        number: int,
+        title: str | int | None = None,
+        body: str | None = None,
+        state: Literal["open", "closed"] | None = None,
+        state_reason: Literal["completed", "not_planned", "reopened"] | None = None,
+    ):
+        """
+        Update an issue.
+
+        Parameters
+        ----------
+        number : int
+            Issue number.
+        data : dict
+
+
+        Returns
+        -------
+
+        References
+        ----------
+        - [GitHub Docs](https://docs.github.com/en/rest/issues/issues?apiVersion=2022-11-28#update-an-issue)
+        """
+        data = {}
+        if title is not None:
+            data["title"] = str(title)
+        if body is not None:
+            data["body"] = str(body)
+        if state is not None:
+            data["state"] = state
+        if state_reason is not None:
+            data["state_reason"] = state_reason
+        return self._rest_query(f"issues/{number}", verb="PATCH", data=data)
+
+    def issue_add_assignees(self, number: int, assignees: str | list[str]):
+        if isinstance(assignees, str):
+            assignees = [assignees]
+        return self._rest_query(f"issues/{number}/assignees", verb="POST", data={"assignees": assignees})
+
     def issue_labels(self, number: int) -> list[dict]:
         labels = []
         page = 1
@@ -514,8 +555,6 @@ class Repo:
         if not data:
             raise ValueError("At least one of 'new_name', 'color', or 'description' must be specified.")
         return self._rest_query(query=f"labels/{name}", verb="PATCH", data=data)
-
-
 
     @staticmethod
     def _validate_label_data(name: str, color: str, description: str):
