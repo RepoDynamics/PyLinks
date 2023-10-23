@@ -43,13 +43,15 @@ class GitHub:
         self,
         query: str,
         verb: Literal["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"] = "GET",
-        data=None
+        data=None,
+        json=None
     ):
         return request(
             verb=verb,
             url=self._base / query,
             headers=self._headers,
             data=data,
+            json=json,
             response_type="json"
         )
 
@@ -96,9 +98,10 @@ class Repo:
         self,
         query: str = "",
         verb: Literal["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"] = "GET",
-        data=None
+        data=None,
+        json=None
     ):
-        return self._github.rest_query(f"repos/{self._username}/{self._name}/{query}", verb=verb, data=data)
+        return self._github.rest_query(f"repos/{self._username}/{self._name}/{query}", verb=verb, data=data, json=json)
 
     @property
     def username(self) -> str:
@@ -519,7 +522,7 @@ class Repo:
                 "branch": branch,
                 "path": path,
             }
-        return self._rest_query(query="pages", verb="POST", data=data)
+        return self._rest_query(query="pages", verb="POST", json=data)
 
     def label_create(self, name: str, color: str = "", description: str = ""):
         self._validate_label_data(name, color, description)
