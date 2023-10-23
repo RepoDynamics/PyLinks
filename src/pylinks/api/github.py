@@ -44,7 +44,8 @@ class GitHub:
         query: str,
         verb: Literal["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"] = "GET",
         data=None,
-        json=None
+        json=None,
+        response_type: Literal["json", "str", "bytes"] | None = "json"
     ):
         return request(
             verb=verb,
@@ -52,7 +53,7 @@ class GitHub:
             headers=self._headers,
             data=data,
             json=json,
-            response_type="json"
+            response_type=response_type
         )
 
     @property
@@ -99,9 +100,16 @@ class Repo:
         query: str = "",
         verb: Literal["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"] = "GET",
         data=None,
-        json=None
+        json=None,
+        response_type: Literal["json", "str", "bytes"] | None = "json"
     ):
-        return self._github.rest_query(f"repos/{self._username}/{self._name}/{query}", verb=verb, data=data, json=json)
+        return self._github.rest_query(
+            f"repos/{self._username}/{self._name}/{query}",
+            verb=verb,
+            data=data,
+            json=json,
+            response_type=response_type
+        )
 
     @property
     def username(self) -> str:
@@ -377,12 +385,12 @@ class Repo:
             data["state"] = state
         if state_reason is not None:
             data["state_reason"] = state_reason
-        return self._rest_query(f"issues/{number}", verb="PATCH", data=data)
+        return self._rest_query(f"issues/{number}", verb="PATCH", json=data)
 
     def issue_add_assignees(self, number: int, assignees: str | list[str]):
         if isinstance(assignees, str):
             assignees = [assignees]
-        return self._rest_query(f"issues/{number}/assignees", verb="POST", data={"assignees": assignees})
+        return self._rest_query(f"issues/{number}/assignees", verb="POST", json={"assignees": assignees})
 
     def issue_labels(self, number: int) -> list[dict]:
         labels = []
@@ -410,7 +418,7 @@ class Repo:
         ----------
         - [GitHub Docs](https://docs.github.com/en/rest/issues/labels?apiVersion=2022-11-28#set-labels-for-an-issue)
         """
-        return self._rest_query(f"issues/{number}/labels", verb="PUT", data={"labels": labels})
+        return self._rest_query(f"issues/{number}/labels", verb="PUT", json={"labels": labels})
 
     def issue_comments(self, number: int, max_count: int = 1000) -> list[dict]:
         """
@@ -445,10 +453,10 @@ class Repo:
         return comments
 
     def issue_comment_create(self, number: int, body: str) -> dict:
-        return self._rest_query(f"issues/{number}/comments", verb="POST", data={"body": body})
+        return self._rest_query(f"issues/{number}/comments", verb="POST", json={"body": body})
 
     def issue_comment_update(self, comment_id: int, body: str) -> dict:
-        return self._rest_query(f"issues/comments/{comment_id}", verb="PATCH", data={"body": body})
+        return self._rest_query(f"issues/comments/{comment_id}", verb="PATCH", json={"body": body})
 
     def pull_create(
         self,
@@ -462,6 +470,8 @@ class Repo:
         head_repo: str = ""
     ) -> dict:
         data = {"head": head, "base": base, "maintainer_can_modify": maintainer_can_modify, "draft": draft}
+        if not (issue or title):
+            raise ValueError("Either 'issue' or 'title' must be specified.")
         if issue:
             data["issue"] = issue
         if title:
@@ -470,11 +480,11 @@ class Repo:
             data["body"] = body
         if head_repo:
             data["head_repo"] = head_repo
-        return self._rest_query(query="pulls", verb="POST", data=data)
+        return self._rest_query(query="pulls", verb="POST", json=data)
 
     def update_settings(self, settings: dict):
-        """For settings, see https://docs.github.com/en/rest/reference/repos#update-a-repository-settings"""
-        return self._rest_query(verb="PATCH", data=settings)
+        """For settings, see https://docs.github.com/en/free-pro-team@latest/rest/repos/repos?apiVersion=2022-11-28#update-a-repository"""
+        return self._rest_query(verb="PATCH", json=settings)
 
     def replace_topics(self, topics: list[str]):
         topic_pattern = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
@@ -485,7 +495,7 @@ class Repo:
                 raise ValueError(f"Topic must be 50 characters or less: {topic}.")
             if not topic_pattern.match(topic):
                 raise ValueError(f"Topic contains invalid pattern: {topic}.")
-        return self._rest_query(query="topics", verb="PUT", data={"names": list(topics)})
+        return self._rest_query(query="topics", verb="PUT", json={"names": list(topics)})
 
     def activate_pages(
         self,
@@ -531,7 +541,7 @@ class Repo:
             data["color"] = color
         if description:
             data["description"] = description
-        return self._rest_query(query="labels", verb="POST", data=data)
+        return self._rest_query(query="labels", verb="POST", json=data)
 
     def label_delete(self, name: str):
         if not isinstance(name, str):
@@ -539,7 +549,7 @@ class Repo:
                 f"Invalid input: name='{name}'. "
                 f"The label name must be a string, not {type(name)}."
             )
-        return self._rest_query(query=f"labels/{name}", verb="DELETE")
+        return self._rest_query(query=f"labels/{name}", verb="DELETE", response_type="str")
 
     def label_update(self, name: str, new_name: str = "", color: str = "", description: str = ""):
         self._validate_label_data(new_name, color, description)
@@ -557,7 +567,7 @@ class Repo:
             data["description"] = description
         if not data:
             raise ValueError("At least one of 'new_name', 'color', or 'description' must be specified.")
-        return self._rest_query(query=f"labels/{name}", verb="PATCH", data=data)
+        return self._rest_query(query=f"labels/{name}", verb="PATCH", json=data)
 
     @staticmethod
     def _validate_label_data(name: str, color: str, description: str):
