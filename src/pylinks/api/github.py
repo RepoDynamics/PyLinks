@@ -482,6 +482,28 @@ class Repo:
             data["head_repo"] = head_repo
         return self._rest_query(query="pulls", verb="POST", json=data)
 
+    def pull_update(
+        self,
+        number: int,
+        title: str | None = None,
+        body: str | None = None,
+        state: Literal["open", "closed"] | None = None,
+        base: str | None = None,
+        maintainer_can_modify: bool | None = None,
+    ) -> dict:
+        data = {}
+        if title is not None:
+            data["title"] = title
+        if body is not None:
+            data["body"] = body
+        if state is not None:
+            data["state"] = state
+        if base is not None:
+            data["base"] = base
+        if maintainer_can_modify is not None:
+            data["maintainer_can_modify"] = maintainer_can_modify
+        return self._rest_query(query=f"pulls/{number}", verb="PATCH", json=data)
+
     def update_settings(self, settings: dict):
         """For settings, see https://docs.github.com/en/free-pro-team@latest/rest/repos/repos?apiVersion=2022-11-28#update-a-repository"""
         return self._rest_query(verb="PATCH", json=settings)
