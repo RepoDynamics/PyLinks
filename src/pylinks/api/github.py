@@ -6,7 +6,7 @@ import mimetypes
 
 # Non-standard libraries
 import pylinks
-from pylinks import request, url
+from pylinks import request, url, graphql_query
 
 
 class GitHub:
@@ -28,18 +28,15 @@ class GitHub:
     def graphql_query(
         self,
         query: str,
-        mutation: bool = False,
         extra_headers: dict | None = None,
-        response_type: Literal["json", "str", "bytes"] | None = "json",
-    ):
+    ) -> dict:
         headers = self._headers | extra_headers if extra_headers else self._headers
-        return request(
+        response = graphql_query(
             url=self._endpoint["api"] / "graphql",
-            verb="POST",
-            json={"query": f"{'mutation 'if mutation else ''}{{{query}}}"},
+            query=f"{{{query}}}",
             headers=headers,
-            response_type=response_type,
         )
+        return response
 
     def graphql_mutation(
         self, mutation_name: str,
@@ -53,16 +50,13 @@ class GitHub:
             f'mutation($mutationInput:{mutation_input_name}!) '
             f'{{{mutation_name}(input:$mutationInput) {{{mutation_payload}}}}}'
         )
-        response = request(
+        response = graphql_query(
             url=self._endpoint["api"] / "graphql",
-            verb="POST",
-            json={"query": query, "variables": {"mutationInput": mutation_input}},
+            query=query,
+            variables={"mutationInput": mutation_input},
             headers=headers,
-            response_type="json",
         )
-        if "errors" in response:
-            return response
-        return response["data"]
+        return response
 
     def rest_query(
         self,
@@ -411,23 +405,12 @@ class Repo:
         - [GitHub Docs](https://docs.github.com/en/graphql/guides/using-the-graphql-api-for-discussions)
         -
         """
-        query = f"""
-            repository(name: "{self._name}", owner: "{self._username}") {{
-              discussionCategories(first: 25) {{
-                edges {{
-                  node {{
-                    name
-                    slug
-                    id
-                  }}
-                }}
-              }}
-            }}
-        """
-        response: dict = self._github.graphql_query(query)
+        payload = "{discussionCategories(first: 100) {edges {node {name, slug, id}}}}"
+        query = f'repository(name: "{self._name}", owner: "{self._username}") {payload}'
+        data = self._github.graphql_query(query)
         discussions = [
             entry["node"]
-            for entry in response["data"]["repository"]["discussionCategories"]["edges"]
+            for entry in data["repository"]["discussionCategories"]["edges"]
         ]
         return discussions
 
@@ -799,18 +782,16 @@ class Repo:
 
         has_discussions = data.pop("has_discussions")
         if has_discussions is not None:
-            query = f'''
-                updateRepository(
-                    input: {{
-                        hasDiscussionsEnabled: {'true' if has_discussions else 'false'}, 
-                        repositoryId: "{self.info['node_id']}"
-                    }}
-                ) {{
-                    repository {{hasDiscussionsEnabled}}
-                }}
-            '''
-            out = self._github.graphql_query(query=query, mutation=True)
-            output["hasDiscussionsEnabled"] = out['data']['updateRepository']['repository']['hasDiscussionsEnabled']
+            out = self._github.graphql_mutation(
+                mutation_name="updateRepository",
+                mutation_input_name="UpdateRepositoryInput",
+                mutation_input={
+                    "hasDiscussionsEnabled": has_discussions,
+                    "repositoryId": self.info["node_id"]
+                },
+                mutation_payload="repository {hasDiscussionsEnabled}"
+            )
+            output["hasDiscussionsEnabled"] = out['updateRepository']['repository']['hasDiscussionsEnabled']
 
         private_vulnerability_reporting = data.pop("private_vulnerability_reporting")
         if private_vulnerability_reporting is not None:
@@ -1175,29 +1156,23 @@ class Repo:
         ----------
         - [GitHub API Docs](https://docs.github.com/en/graphql/reference/mutations#createlinkedbranch)
         """
-        inputs = f'issueId: "{issue_id}", oid: "{base_sha}", '
-        if name:
-            inputs += f'name: "{name}", '
-        if repository_id:
-            inputs += f'repositoryId: "{repository_id}", '
-        inputs = inputs.rstrip(", ")
-        query = f'''
-            createLinkedBranch(
-                input: {{{inputs}}}
-            ) {{
-                linkedBranch {{
-                    ref {{
-                        name
-                        target {{oid}}
-                    }}
-                }}
-            }}
-        '''
-        out = self._github.graphql_query(query=query, mutation=True)
-        if "errors" in out:
-            return out
-        data = out["data"]["createLinkedBranch"]["linkedBranch"]["ref"]
-        return {"name": data["name"], "sha": data["target"]["oid"]}
+        args = locals()
+        args.pop("self")
+        input_map = {
+            "issue_id": "issueId",
+            "base_sha": "oid",
+            "name": "name",
+            "repository_id": "repositoryId",
+        }
+        inputs = {input_map[k]: v for k, v in args.items() if v is not None}
+        data = self._github.graphql_mutation(
+            mutation_name="createLinkedBranch",
+            mutation_input_name="CreateLinkedBranchInput",
+            mutation_input=inputs,
+            mutation_payload="linkedBranch {ref {name target {oid}}}"
+        )
+        out = data["createLinkedBranch"]["linkedBranch"]["ref"]
+        return {"name": out["name"], "sha": out["target"]["oid"]}
 
     def branch_rename(self, old_name: str, new_name: str) -> dict:
         """
@@ -1218,6 +1193,19 @@ class Repo:
         - [GitHub API Docs](https://docs.github.com/en/graphql/reference/mutations#renameref)
         """
         return self._rest_query(query=f"branches/{old_name}/rename", verb="POST", json={"new_name": new_name})
+
+    def branch_protection_rules(self) -> list[dict]:
+        """
+        Get the branch protection rules for the repository.
+
+        References
+        ----------
+        - [GitHub API Docs](https://docs.github.com/en/graphql/reference/objects#branchprotectionruleconnection)
+        """
+        payload = "{branchProtectionRules(first: 100) {nodes {id, pattern}}}"
+        query = f'repository(name: "{self._name}", owner: "{self._username}") {payload}'
+        data = self._github.graphql_query(query)
+        return data["repository"]["branchProtectionRules"]["nodes"]
 
     def branch_protection_rule_create(
         self,
@@ -1255,20 +1243,17 @@ class Repo:
         ----------
         - [GitHub API Docs](https://docs.github.com/en/graphql/reference/mutations#createbranchprotectionrule)
         """
-        data = locals()
-        data.pop("self")
-        inputs = self._prepare_branch_protection_rule_input(data)
+        args = locals()
+        args.pop("self")
+        inputs = self._prepare_branch_protection_rule_input(args)
         inputs["repositoryId"] = self.info["node_id"]
-        out = self._github.graphql_mutation(
+        data = self._github.graphql_mutation(
             mutation_name="createBranchProtectionRule",
             mutation_input_name="CreateBranchProtectionRuleInput",
             mutation_input=inputs,
             mutation_payload="branchProtectionRule {id}",
         )
-        if "errors" in out:
-            return out
-        data = out["createBranchProtectionRule"]["branchProtectionRule"]["id"]
-        return data
+        return data["createBranchProtectionRule"]["branchProtectionRule"]["id"]
 
     def branch_protection_rule_update(
         self,
@@ -1300,19 +1285,16 @@ class Repo:
         bypass_pull_request_actor_ids: list[str] | None = None,
         review_dismissal_actor_ids: list[str] | None = None,
     ):
-        data = locals()
-        data.pop("self")
-        inputs = self._prepare_branch_protection_rule_input(data)
-        out = self._github.graphql_mutation(
+        args = locals()
+        args.pop("self")
+        inputs = self._prepare_branch_protection_rule_input(args)
+        data = self._github.graphql_mutation(
             mutation_name="updateBranchProtectionRule",
             mutation_input_name="UpdateBranchProtectionRuleInput",
             mutation_input=inputs,
             mutation_payload="branchProtectionRule {id}",
         )
-        if "errors" in out:
-            return out
-        data = out["updateBranchProtectionRule"]["branchProtectionRule"]["id"]
-        return data
+        return data["updateBranchProtectionRule"]["branchProtectionRule"]["id"]
 
     def _prepare_branch_protection_rule_input(self, kwargs: dict):
         arg_map = {
