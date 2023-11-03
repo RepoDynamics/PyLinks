@@ -13,5 +13,5 @@ Other available modules offer shortcuts for creating useful URLs for popular onl
 
 from ._settings import settings
 from .url import url
-from .http import request, download
+from .http import request, download, graphql_query
 from . import api, site
