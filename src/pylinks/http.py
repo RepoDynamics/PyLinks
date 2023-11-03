@@ -190,8 +190,8 @@ def request(
     response_verifier: Optional[Callable[[Any], bool]] = None,
     retry_config: Optional[HTTPRequestRetryConfig] = HTTPRequestRetryConfig(),
     ignored_status_codes: Optional[Sequence[int]] = None,
-    **json_kwargs,
-) -> Union[requests.Response, str, dict, bytes]:
+    json_kwargs: dict = None,
+) -> Union[requests.Response, str, dict, list, bool, int, bytes]:
     """
     Send an HTTP request and get the response in specified type.
 
@@ -223,7 +223,8 @@ def request(
     json
     response_type
     encoding
-    json_kwargs
+    json_kwargs : dict
+        Optional arguments for `json.loads`, when `response_type` is set to `"json"`.
 
     Returns
     -------
@@ -298,12 +299,12 @@ def request(
         elif response_type == "str":
             response_value = response.text
         elif response_type == "json":
-            response_value = response.json(**json_kwargs)
+            response_value = response.json(**(json_kwargs or {}))
         elif response_type == "bytes":
             response_value = response.content
         else:
             raise ValueError(f"`response_type` {response_type} not recognized.")
-        # If no verifier is specified, or verifier accepts the response value, the return the value
+        # If no verifier is specified, or verifier accepts the response value, then return the value
         if response_verifier is None or response_verifier(response_value):
             return response_value
         # otherwise raise
@@ -326,6 +327,48 @@ def request(
     )
     # Call the (decorated or non-decorated) response-value function and return.
     return response_val_func()
+
+
+def graphql_query(
+    url: str,
+    query: str,
+    variables: dict | None = None,
+    params: Optional[Union[dict, List[tuple], bytes]] = None,
+    data: Optional[Union[dict, List[tuple], bytes]] = None,
+    headers=None,
+    cookies=None,
+    files=None,
+    auth=None,
+    timeout: Optional[Union[float, Tuple[float, float]]] = (10, 20),
+    allow_redirects=True,
+    proxies=None,
+    hooks=None,
+    stream=None,
+    verify=None,
+    cert=None,
+    response_type: Optional[Literal["str", "json", "bytes"]] = "json",
+    encoding: Optional[str] = None,
+    response_verifier: Optional[Callable[[Any], bool]] = None,
+    retry_config: Optional[HTTPRequestRetryConfig] = HTTPRequestRetryConfig(),
+    ignored_status_codes: Optional[Sequence[int]] = None,
+    json_kwargs: dict = None,
+) -> Union[requests.Response, str, dict, list, bool, int, bytes]:
+    args = locals()
+    args["verb"] = "POST"
+    args["json"] = {"query": args.pop('query')}
+    variables = args.pop("variables")
+    if variables is not None:
+        args["json"]["variables"] = variables
+    print(args)
+    response = request(**args)
+    if isinstance(response, dict):
+        if "errors" in response:
+            raise WebAPIError(response)
+        elif "data" not in response:
+            raise WebAPIError(response)
+        else:
+            response = response["data"]
+    return response
 
 
 def download(url: str, filepath: str | Path, create_dirs: bool = True, overwrite: bool = False) -> Path:
