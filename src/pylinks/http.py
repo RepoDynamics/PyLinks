@@ -2,7 +2,7 @@
 Handling HTTP requests and responses.
 """
 
-from pathlib import Path
+
 from typing import (
     Any,
     Callable,
@@ -14,132 +14,36 @@ from typing import (
     Sequence,
     Tuple,
     Union,
+    Type,
 )
-
+import time
+from functools import wraps
+from pathlib import Path
 import requests
-from ._decorator import RetryConfig, retry_on_exception
+from pylinks import exceptions
 
 
-__author__ = "Armin Ariamajd"
-
-
-class WebAPIError(IOError):
-    """Base Exception class for all web API exceptions."""
-    pass
-
-
-class WebAPIStatusCodeError(WebAPIError):
+class RetryConfig(NamedTuple):
     """
-    Base Exception class for web API status code related exceptions.
-    Raised by `opencadd.webapi.http_request.raise_for_status_code`.
-    By default, raised when status code is in range [400, 600).
-    """
+    Configuration for the `retry_on_exception` decorator.
 
-    def __init__(self, response: requests.Response):
-        self.response: requests.Response = response
-        # Decode error reason from server
-        # This part is adapted from `requests` library; See PR #3538 on their GitHub
-        if isinstance(response.reason, bytes):
-            try:
-                self.reason = response.reason.decode("utf-8")
-            except UnicodeDecodeError:
-                self.reason = response.reason.decode("iso-8859-1")
-        else:
-            self.reason = response.reason
-        self.response_msg = response.text
-        self.side = "client" if response.status_code < 500 else "server"
-        self.status_code = response.status_code
-        self.url = response.url
-
-        error_msg = (
-            f"HTTP {self.side} error (status code: {self.status_code})\n"
-            f"- From: {self.url}\n"
-            f"- Reason: {self.reason}\n"
-            f"- Response: {self.response_msg}"
-        )
-        super().__init__(error_msg)
-        return
-
-
-class WebAPITemporaryStatusCodeError(WebAPIStatusCodeError):
-    """
-    Exception class for status code errors related to temporary issues.
-    Raised by `opencadd.webapi.http_request.raise_for_status_code`.
-    By default, raised when status code is in (408, 429, 500, 502, 503, 504).
-    """
-
-    pass
-
-
-class WebAPIPersistentStatusCodeError(WebAPIStatusCodeError):
-    """
-    Exception class for status code errors related to persistent issues.
-    Raised by `opencadd.webapi.http_request.raise_for_status_code`.
-    By default, raised when status code is in range [400, 600),
-    but not in (408, 429, 500, 502, 503, 504).
-    """
-
-    pass
-
-
-class WebAPIValueError(WebAPIError):
-    """
-    Exception class for response value errors.
-    Raised by `opencadd.webapi.http_request.response_http_request`.
-
-    """
-
-    def __init__(self, response_value: Any, response_verifier: Callable[[Any], bool]):
-        self.response_value = response_value
-        self.response_verifier = response_verifier
-        error_msg = (
-            f"Response verifier function {response_verifier} failed to verify {response_value}."
-        )
-        super().__init__(error_msg)
-        return
-
-
-def raise_for_status_code(
-    response: requests.Response,
-    error_status_code_range: Tuple[int, int] = (400, 599),
-    temporary_error_status_codes: Optional[Sequence[int]] = (408, 429, 500, 502, 503, 504),
-    ignored_status_codes: Optional[Sequence[int]] = None,
-) -> NoReturn:
-    """
-    Raise an `opencadd.webapi.http_request.WebAPIStatusCodeError` for certain HTTP status codes.
-
-    Parameters
+    Attributes
     ----------
-    response : requests.Response
-        Response of an HTTP request, i.e. the returned object from `requests.request`.
-    error_status_code_range : Tuple[int, int], optional, default: (400, 599)
-        Range of HTTP status codes considered to be error codes.
-    temporary_error_status_codes : Sequence[int], optional, default: (408, 429, 500, 502, 503, 504)
-        Set of status codes related to temporary errors. If the status code of the response is
-        one of these, an `opencadd.webapi.http_request.WebAPITemporaryStatusCodeError` is raised,
-        otherwise an `opencadd.webapi.http_request.WebAPIPersistentStatusCodeError` is raised if
-        the status code is inside `error_status_code_range`.
-    ignored_status_codes : Sequence[int], optional, default: None
-        Set of status codes inside `error_status_code_range` to ignore, i.e. not raise.
-
-    Raises
-    ------
-    opencadd.webapi.http_request.WebAPITemporaryStatusCodeError
-        When the status code is in `temporary_error_status_codes`.
-    opencadd.webapi.http_request.WebAPIPersistentError
-        When the satus code is in range `error_status_code_range`
-        and not inside `temporary_error_status_codes`.
+    num_tries : int, default: 3
+        Maximum number of times the decorated function will be called
+        before an exception is reraised.
+    sleep_time_init : float, default: 1
+        Amount of time (in seconds) to wait before two function calls.
+    sleep_time_scale : float, default: 3
+        Scaling factor for `sleep_time_init`.
+        This can be used to scale down/up the waiting time between function calls.
+        After the n-th function call, the waiting time will be equal to:
+        `sleep_time_init` * `sleep_time_scale` ^ (n - 1).
     """
-    if ignored_status_codes is not None and response.status_code in ignored_status_codes:
-        return
-    if (
-        temporary_error_status_codes is not None
-        and response.status_code in temporary_error_status_codes
-    ):
-        raise WebAPITemporaryStatusCodeError(response)
-    if error_status_code_range[0] <= response.status_code <= error_status_code_range[1]:
-        raise WebAPIPersistentStatusCodeError(response)
-    return
+
+    num_tries: int = 3
+    sleep_time_init: float = 1
+    sleep_time_scale: float = 3
 
 
 class HTTPRequestRetryConfig(NamedTuple):
@@ -264,7 +168,7 @@ def request(
                 cert=cert,
                 json=json,
             )
-            raise_for_status_code(
+            _raise_for_status_code(
                 response=response,
                 temporary_error_status_codes=(
                     None if retry_config is None else retry_config.status_codes_to_retry
@@ -282,10 +186,10 @@ def request(
                 or retry_config.status_codes_to_retry is None
                 or retry_config.config_status is None
             )
-            else retry_on_exception(
+            else _retry_on_exception(
                 get_response,
                 config=retry_config.config_status,
-                catch=WebAPITemporaryStatusCodeError,
+                catch=exceptions.WebAPITemporaryStatusCodeError,
             )
         )
         # Call the (decorated or non-decorated) response function.
@@ -308,7 +212,7 @@ def request(
         if response_verifier is None or response_verifier(response_value):
             return response_value
         # otherwise raise
-        raise WebAPIValueError(response_value=response_value, response_verifier=response_verifier)
+        raise exceptions.WebAPIValueError(response_value=response_value, response_verifier=response_verifier)
 
     # Depending on specifications in argument `retry_config`, either decorate `get_response_value`
     # with `retry_on_exception`, or leave it as is.
@@ -319,10 +223,10 @@ def request(
             or retry_config.config_response is None
             or response_verifier is None
         )
-        else retry_on_exception(
+        else _retry_on_exception(
             get_response_value,
             config=retry_config.config_response,
-            catch=WebAPIValueError,
+            catch=exceptions.WebAPIValueError,
         )
     )
     # Call the (decorated or non-decorated) response-value function and return.
@@ -359,13 +263,12 @@ def graphql_query(
     variables = args.pop("variables")
     if variables is not None:
         args["json"]["variables"] = variables
-    print(args)
     response = request(**args)
     if isinstance(response, dict):
         if "errors" in response:
-            raise WebAPIError(response)
+            raise exceptions.WebAPIError(response)
         elif "data" not in response:
-            raise WebAPIError(response)
+            raise exceptions.WebAPIError(response)
         else:
             response = response["data"]
     return response
@@ -410,3 +313,93 @@ def download(url: str, filepath: str | Path, create_dirs: bool = True, overwrite
     with open(filepath, "wb") as f:
         f.write(content)
     return filepath
+
+
+def _raise_for_status_code(
+    response: requests.Response,
+    error_status_code_range: Tuple[int, int] = (400, 599),
+    temporary_error_status_codes: Optional[Sequence[int]] = (408, 429, 500, 502, 503, 504),
+    ignored_status_codes: Optional[Sequence[int]] = None,
+) -> NoReturn:
+    """
+    Raise an `opencadd.webapi.http_request.WebAPIStatusCodeError` for certain HTTP status codes.
+
+    Parameters
+    ----------
+    response : requests.Response
+        Response of an HTTP request, i.e. the returned object from `requests.request`.
+    error_status_code_range : Tuple[int, int], optional, default: (400, 599)
+        Range of HTTP status codes considered to be error codes.
+    temporary_error_status_codes : Sequence[int], optional, default: (408, 429, 500, 502, 503, 504)
+        Set of status codes related to temporary errors. If the status code of the response is
+        one of these, an `opencadd.webapi.http_request.WebAPITemporaryStatusCodeError` is raised,
+        otherwise an `opencadd.webapi.http_request.WebAPIPersistentStatusCodeError` is raised if
+        the status code is inside `error_status_code_range`.
+    ignored_status_codes : Sequence[int], optional, default: None
+        Set of status codes inside `error_status_code_range` to ignore, i.e. not raise.
+
+    Raises
+    ------
+    opencadd.webapi.http_request.WebAPITemporaryStatusCodeError
+        When the status code is in `temporary_error_status_codes`.
+    opencadd.webapi.http_request.WebAPIPersistentError
+        When the satus code is in range `error_status_code_range`
+        and not inside `temporary_error_status_codes`.
+    """
+    if ignored_status_codes is not None and response.status_code in ignored_status_codes:
+        return
+    if (
+        temporary_error_status_codes is not None
+        and response.status_code in temporary_error_status_codes
+    ):
+        raise exceptions.WebAPITemporaryStatusCodeError(response)
+    if error_status_code_range[0] <= response.status_code <= error_status_code_range[1]:
+        raise exceptions.WebAPIPersistentStatusCodeError(response)
+    return
+
+
+def _retry_on_exception(
+    function: Optional[Callable] = None,
+    *,
+    config: RetryConfig = RetryConfig(),
+    catch: Type[Exception] | tuple[Type[Exception]] = Exception,
+) -> Callable:
+    """
+    Decorator to retry a function call for a given number of times
+    (while waiting for a certain amount of time between calls),
+    when one of the given exceptions is raised.
+
+    Parameters
+    ----------
+    function : callable
+        The function to be decorated.
+    config : RetryConfig, default: RetryConfig(3, 1, 3)
+        Retry configuration.
+    catch : Type[Exception] | tuple[Type[Exception]], default: Exception
+        Exception type(s) that will be ignored during the retries.
+        All other exceptions will be raised immediately.
+
+    Returns
+    -------
+    callable
+        Decorated function.
+    """
+    if not isinstance(config.num_tries, int) or config.num_tries < 1:
+        raise ValueError("`num_tries` must be a positive integer.")
+
+    def retry_decorator(func):
+        @wraps(func)
+        def retry_wrapper(*args, **kwargs):
+            curr_sleep_seconds = config.sleep_time_init
+            for try_count in range(config.num_tries):
+                try:
+                    return func(*args, **kwargs)
+                except catch as e:
+                    if try_count == config.num_tries - 1:
+                        raise e
+                    time.sleep(curr_sleep_seconds)
+                    curr_sleep_seconds *= config.sleep_time_scale
+
+        return retry_wrapper
+
+    return retry_decorator if function is None else retry_decorator(function)
