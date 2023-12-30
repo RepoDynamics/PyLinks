@@ -1084,6 +1084,413 @@ class Repo:
             endpoint="upload"
         )
 
+    def rulesets(self, include_parents: bool = True) -> list[dict]:
+        """
+        List of all rulesets for the repository.
+
+        References
+        ----------
+        - [GitHub Docs](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28#get-all-repository-rulesets)
+        """
+        rulesets = []
+        page = 1
+        while True:
+            response = self._rest_query(
+                f"rulesets?per_page=100&page={page}&includes_parents={'true' if include_parents else 'false'}"
+            )
+            rulesets.extend(response)
+            page += 1
+            if len(response) < 100:
+                break
+        return rulesets
+
+    def ruleset_create(
+        self,
+        name: str,
+        target: Literal['branch', 'tag'] = "branch",
+        enforcement: Literal['disabled', 'evaluate', 'active'] = 'active',
+        bypass_actors: list[
+           tuple[int, Literal['OrganizationAdmin', 'RepositoryRole', 'Team', 'Integration'], bool]
+        ] | None = None,
+        ref_name_include: list[str] | None = None,
+        ref_name_exclude: list[str] | None = None,
+        creation: bool = False,
+        update: bool = False,
+        update_allows_fetch_and_merge: bool = True,
+        deletion: bool = False,
+        required_linear_history: bool = False,
+        required_deployment_environments: list[str] | None = None,
+        required_signatures: bool = False,
+        required_pull_request: bool = False,
+        dismiss_stale_reviews_on_push: bool = False,
+        require_code_owner_review: bool = False,
+        require_last_push_approval: bool = False,
+        required_approving_review_count: int = 0,
+        required_review_thread_resolution: bool = False,
+        required_status_checks: list[tuple[str, int] | str] | None = None,
+        strict_required_status_checks_policy: bool = False,
+        non_fast_forward: bool = False,
+    ) -> dict:
+        """
+        Create a new ruleset.
+
+        Parameters
+        ----------
+        name : str
+            The name of the ruleset.
+        target : {'branch', 'tag'}, default: 'branch'
+            The target for the ruleset.
+        enforcement : {'disabled', 'evaluate', 'active'}, default: 'active'
+            The enforcement level for the ruleset.
+            'evaluate' (only available with GitHub Enterprise) allows admins
+            to test rules before enforcing them.
+            Admins can then view insights on the Rule Insights page.
+        bypass_actors : list[tuple[int, {'OrganizationAdmin', 'RepositoryRole', 'Team', 'Integration'}, bool]], optional
+            A list of tuples of (actor ID, actor type, always bypass):
+            - actor ID: The ID of the actor that can bypass a ruleset.
+              If actor type is 'OrganizationAdmin', this should be 1.
+            - actor type: The type of the actor that can bypass a ruleset.
+              Can be one of 'OrganizationAdmin', 'RepositoryRole', 'Team', or 'Integration'.
+            - always bypass: Whether the actor can always bypass the ruleset (True) or only on pull requests (False).
+        ref_name_include : list[str], optional
+            A list of ref names or patterns to include.
+            One of these patterns must match for the condition to pass.
+            Also accepts '~DEFAULT_BRANCH' to include the default branch
+            or '~ALL' to include all branches.
+        ref_name_exclude : list[str], optional
+            A list of ref names or patterns to exclude.
+            The condition will not pass if any of these patterns match.
+        creation : bool, default: False
+            Only allow users with bypass permission to create matching refs.
+        update : bool, default: False
+            Only allow users with bypass permission to update matching refs.
+        update_allows_fetch_and_merge : bool, default: True
+            Whether the branch can still pull changes from its upstream repository
+            even when `update` is set to True.
+        deletion : bool, default: False
+            Only allow users with bypass permissions to delete matching refs.
+        required_linear_history : bool, default: False
+            Prevent merge commits from being pushed to matching refs.
+        required_deployment_environments : list[str], optional
+            A list of environments that must be successfully deployed to before branches can be merged.
+        required_signatures : bool, default: False
+            Commits pushed to matching refs must have verified signatures.
+        required_pull_request : bool, default: False
+            Require all commits be made to a non-target branch
+            and submitted via a pull request before they can be merged.
+        dismiss_stale_reviews_on_push : bool, default: False
+            New, reviewable commits pushed will dismiss previous pull request review approvals.
+        require_code_owner_review : bool, default: False
+            Require an approving review in pull requests that modify files that have a designated code owner.
+        require_last_push_approval : bool, default: False
+            Whether the most recent reviewable push must be approved by someone other than the person who pushed it.
+        required_approving_review_count : int, default: 0
+            The number of approving reviews that are required before a pull request can be merged.
+        required_review_thread_resolution : bool, default: False
+            All conversations on code must be resolved before a pull request can be merged.
+        required_status_checks : list[tuple[str, int] | str], optional
+            A list of status checks that must pass before a pull request can be merged.
+            Each element can either be a string with the name of the status check context,
+            or a tuple of (name, integration ID).
+        strict_required_status_checks_policy : bool, default: False
+            Whether pull requests targeting a matching branch must be tested with the latest code.
+            This setting will not take effect unless at least one status check is enabled.
+        non_fast_forward : bool, default: False
+            Prevent users with push access from force pushing to refs.
+
+    References
+    ----------
+    - [GitHub API Docs](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28#create-a-repository-ruleset)
+    """
+        data = {"name": name, "target": target, "enforcement": enforcement}
+        if bypass_actors:
+            data["bypass_actors"] = [
+                {
+                    "actor_id": actor_id,
+                    "actor_type": actor_type,
+                    "bypass_mode": 'always' if always_bypass else 'pull_request'
+                } for actor_id, actor_type, always_bypass in bypass_actors
+            ]
+        if ref_name_include:
+            data["conditions"] = {
+                "ref_name": {"include": ref_name_include}
+            }
+        if ref_name_exclude:
+            ref_name_conditions = data.setdefault("conditions", {}).setdefault("ref_name", {})
+            ref_name_conditions["exclude"] = ref_name_exclude
+        rules = []
+        if creation:
+            rules.append({"type": "creation"})
+        if update:
+            rules.append(
+                {
+                    "type": "update",
+                    "parameters": {"update_allows_fetch_and_merge": update_allows_fetch_and_merge}
+                }
+            )
+        if deletion:
+            rules.append({"type": "deletion"})
+        if required_linear_history:
+            rules.append({"type": "required_linear_history"})
+        if required_deployment_environments:
+            rules.append(
+                {
+                    "type": "required_deployments",
+                    "parameters": {"required_deployment_environments": required_deployment_environments}
+                }
+            )
+        if required_signatures:
+            rules.append({"type": "required_signatures"})
+        if required_pull_request:
+            rules.append(
+                {
+                    "type": "pull_request",
+                    "parameters": {
+                        "dismiss_stale_reviews_on_push": dismiss_stale_reviews_on_push,
+                        "require_code_owner_review": require_code_owner_review,
+                        "require_last_push_approval": require_last_push_approval,
+                        "required_approving_review_count": required_approving_review_count,
+                        "required_review_thread_resolution": required_review_thread_resolution,
+                    }
+                }
+            )
+        if required_status_checks:
+            rules.append(
+                {
+                    "type": "required_status_checks",
+                    "parameters": {
+                        "required_status_checks": [
+                            {"context": required_status_check} if isinstance(required_status_check, str)
+                            else {
+                                "context": required_status_check[0],
+                                "integration_id": required_status_check[1]
+                            } for required_status_check in required_status_checks
+                        ],
+                        "strict_required_status_checks_policy": strict_required_status_checks_policy,
+                    }
+                }
+            )
+        if non_fast_forward:
+            rules.append({"type": "non_fast_forward"})
+        if rules:
+            data["rules"] = rules
+        return self._rest_query(query="rulesets", verb="POST", json=data)
+
+    def ruleset_update(
+        self,
+        ruleset_id: int,
+        name: str | None = None,
+        target: Literal['branch', 'tag'] | None = None,
+        enforcement: Literal['disabled', 'evaluate', 'active'] | None = None,
+        bypass_actors: list[
+           tuple[int, Literal['OrganizationAdmin', 'RepositoryRole', 'Team', 'Integration'], bool]
+        ] | None = None,
+        ref_name_include: list[str] | None = None,
+        ref_name_exclude: list[str] | None = None,
+        creation: bool | None = None,
+        update: bool | None = None,
+        update_allows_fetch_and_merge: bool | None = None,
+        deletion: bool | None = None,
+        required_linear_history: bool | None = None,
+        required_deployment_environments: list[str] | None = None,
+        required_signatures: bool | None = None,
+        required_pull_request: bool | None = None,
+        dismiss_stale_reviews_on_push: bool | None = None,
+        require_code_owner_review: bool | None = None,
+        require_last_push_approval: bool | None = None,
+        required_approving_review_count: int | None = None,
+        required_review_thread_resolution: bool | None = None,
+        require_status_checks: bool | None = None,
+        required_status_checks: list[tuple[str, int] | str] | None = None,
+        strict_required_status_checks_policy: bool | None = None,
+        non_fast_forward: bool | None = None,
+    ) -> dict:
+        """
+        Update a ruleset.
+
+        Parameters
+        ----------
+        ruleset_id : int
+            The ID of the ruleset.
+        name : str, optional
+            The name of the ruleset.
+        target : {'branch', 'tag'}, optional
+            The target for the ruleset.
+        enforcement : {'disabled', 'evaluate', 'active'}, optional
+            The enforcement level for the ruleset.
+            'evaluate' (only available with GitHub Enterprise) allows admins
+            to test rules before enforcing them.
+            Admins can then view insights on the Rule Insights page.
+        bypass_actors : list[tuple[int, {'OrganizationAdmin', 'RepositoryRole', 'Team', 'Integration'}, bool]], optional
+            A list of tuples of (actor ID, actor type, always bypass):
+            - actor ID: The ID of the actor that can bypass a ruleset.
+              If actor type is 'OrganizationAdmin', this should be 1.
+            - actor type: The type of the actor that can bypass a ruleset.
+              Can be one of 'OrganizationAdmin', 'RepositoryRole', 'Team', or 'Integration'.
+            - always bypass: Whether the actor can always bypass the ruleset (True) or only on pull requests (False).
+        ref_name_include : list[str], optional
+            A list of ref names or patterns to include.
+            One of these patterns must match for the condition to pass.
+            Also accepts '~DEFAULT_BRANCH' to include the default branch
+            or '~ALL' to include all branches.
+        ref_name_exclude : list[str], optional
+            A list of ref names or patterns to exclude.
+            The condition will not pass if any of these patterns match.
+        creation : bool, optional
+            Only allow users with bypass permission to create matching refs.
+        update : bool, optional
+            Only allow users with bypass permission to update matching refs.
+        update_allows_fetch_and_merge : bool, optional
+            Whether the branch can still pull changes from its upstream repository
+            even when `update` is set to True.
+        deletion : bool, optional
+            Only allow users with bypass permissions to delete matching refs.
+        required_linear_history : bool, optional
+            Prevent merge commits from being pushed to matching refs.
+        required_deployment_environments : list[str], optional
+            A list of environments that must be successfully deployed to before branches can be merged.
+        required_signatures : bool, optional
+            Commits pushed to matching refs must have verified signatures.
+        required_pull_request : bool, optional
+            Require all commits be made to a non-target branch
+            and submitted via a pull request before they can be merged.
+        dismiss_stale_reviews_on_push : bool, optional
+            New, reviewable commits pushed will dismiss previous pull request review approvals.
+        require_code_owner_review : bool, optional
+            Require an approving review in pull requests that modify files that have a designated code owner.
+        require_last_push_approval : bool, optional
+            Whether the most recent reviewable push must be approved by someone other than the person who pushed it.
+        required_approving_review_count : int, optional
+            The number of approving reviews that are required before a pull request can be merged.
+        required_review_thread_resolution : bool, optional
+            All conversations on code must be resolved before a pull request can be merged.
+        require_status_checks : bool, optional
+            Whether to require status checks to pass before merging for matching branches.
+        required_status_checks : list[tuple[str, int] | str], optional
+            A list of status checks that must pass before a pull request can be merged.
+            Each element can either be a string with the name of the status check context,
+            or a tuple of (name, integration ID).
+        strict_required_status_checks_policy : bool, optional
+            Whether pull requests targeting a matching branch must be tested with the latest code.
+            This setting will not take effect unless at least one status check is enabled.
+        non_fast_forward : bool, optional
+            Prevent users with push access from force pushing to refs.
+
+        References
+        ----------
+        - [GitHub API Docs](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28#update-a-repository-ruleset)
+        """
+        data = {}
+        if name is not None:
+            data["name"] = name
+        if target is not None:
+            data["target"] = target
+        if enforcement is not None:
+            data["enforcement"] = enforcement
+        if bypass_actors is not None:
+            data["bypass_actors"] = [
+                {
+                    "actor_id": actor_id,
+                    "actor_type": actor_type,
+                    "bypass_mode": 'always' if always_bypass else 'pull_request'
+                } for actor_id, actor_type, always_bypass in bypass_actors
+            ]
+        if ref_name_include is not None:
+            data["conditions"] = {
+                "ref_name": {"include": ref_name_include}
+            }
+        if ref_name_exclude is not None:
+            ref_name_conditions = data.setdefault("conditions", {}).setdefault("ref_name", {})
+            ref_name_conditions["exclude"] = ref_name_exclude
+        rules = []
+        update_rules = False
+        if creation is not None:
+            if creation:
+                rules.append({"type": "creation"})
+            else:
+                update_rules = True
+        if update is not None:
+            if update:
+                obj = {"type": "update"}
+                if update_allows_fetch_and_merge is not None:
+                    obj["parameters"] = {"update_allows_fetch_and_merge": update_allows_fetch_and_merge}
+            else:
+                update_rules = True
+        if deletion is not None:
+            if deletion:
+                rules.append({"type": "deletion"})
+            else:
+                update_rules = True
+        if required_linear_history is not None:
+            if required_linear_history:
+                rules.append({"type": "required_linear_history"})
+            else:
+                update_rules = True
+        if required_deployment_environments is not None:
+            if required_deployment_environments:
+                rules.append(
+                    {
+                        "type": "required_deployments",
+                        "parameters": {
+                            "required_deployment_environments": required_deployment_environments
+                        }
+                    }
+                )
+            else:
+                update_rules = True
+        if required_signatures is not None:
+            if required_signatures:
+                rules.append({"type": "required_signatures"})
+            else:
+                update_rules = True
+        if required_pull_request is not None:
+            if required_pull_request:
+                obj = {"type": "pull_request"}
+                if dismiss_stale_reviews_on_push is not None:
+                    obj["parameters"] = {"dismiss_stale_reviews_on_push": dismiss_stale_reviews_on_push}
+                if require_code_owner_review is not None:
+                    params = obj.setdefault("parameters", {})
+                    params["require_code_owner_review"] = require_code_owner_review
+                if require_last_push_approval is not None:
+                    params = obj.setdefault("parameters", {})
+                    params["require_last_push_approval"] = require_last_push_approval
+                if required_approving_review_count is not None:
+                    params = obj.setdefault("parameters", {})
+                    params["required_approving_review_count"] = required_approving_review_count
+                if required_review_thread_resolution is not None:
+                    params = obj.setdefault("parameters", {})
+                    params["required_review_thread_resolution"] = required_review_thread_resolution
+                rules.append(obj)
+            else:
+                update_rules = True
+        if require_status_checks is not None:
+            if require_status_checks:
+                obj = {"type": "required_status_checks"}
+                if required_status_checks is not None:
+                    params = obj.setdefault("parameters", {})
+                    params["required_status_checks"] = [
+                        {"context": required_status_check} if isinstance(required_status_check, str)
+                        else {
+                            "context": required_status_check[0],
+                            "integration_id": required_status_check[1]
+                        } for required_status_check in required_status_checks
+                    ]
+                if strict_required_status_checks_policy is not None:
+                    params = obj.setdefault("parameters", {})
+                    params["strict_required_status_checks_policy"] = strict_required_status_checks_policy
+            else:
+                update_rules = True
+        if non_fast_forward is not None:
+            if non_fast_forward:
+                rules.append({"type": "non_fast_forward"})
+            else:
+                update_rules = True
+        if update_rules:
+            data["rules"] = rules
+        if not data:
+            raise ValueError("At least one of the ruleset parameters must be specified.")
+        return self._rest_query(query=f"rulesets/{ruleset_id}", verb="PUT", json=data)
+
     def actions_permissions_workflow_default(self) -> dict:
         """
         Get default workflow permissions granted to the GITHUB_TOKEN when running workflows in the repository,
