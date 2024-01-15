@@ -503,6 +503,23 @@ class Repo:
         """
         return self._rest_query(f"issues/{number}/labels", verb="PUT", json={"labels": labels})
 
+    def issue_labels_remove(self, number: int, label: str) -> list[dict]:
+        """
+        Remove a label from an issue.
+
+        Parameters
+        ----------
+        number : int
+            Issue number.
+        label : str
+            Label name.
+
+        References
+        ----------
+        - [GitHub Docs](https://docs.github.com/en/rest/issues/labels?apiVersion=2022-11-28#remove-a-label-from-an-issue)
+        """
+        return self._rest_query(f"issues/{number}/labels/{label}", verb="DELETE")
+
     def issue_comments(self, number: int, max_count: int = 1000) -> list[dict]:
         """
         Get a list of comments for an issue/pull request.
