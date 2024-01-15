@@ -124,6 +124,17 @@ class Repo:
         """
         return self.homepage / "actions/workflows" / filename
 
+    def workflow_run(self, run_id: str) -> URL:
+        """
+        URL of the summary page of a specific GitHub Actions workflow run in the repository.
+
+        Parameters
+        ----------
+        run_id : str
+            The ID of the workflow run, e.g. '123456789'.
+        """
+        return self.homepage / "actions/runs" / run_id
+
     def pr_issues(
         self, pr: bool = True, closed: Optional[bool] = None, label: Optional[str] = None
     ) -> URL:
