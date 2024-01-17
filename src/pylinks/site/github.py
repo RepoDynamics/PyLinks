@@ -246,7 +246,7 @@ class Branch:
         self._name = name
         if re.match(r"^[A-Za-z0-9/_.-]+$", name) is None:
             raise ValueError(
-                'GitHub branch names can only contain "_", "-", ".", and alphanumeric characters.'
+                'GitHub branch names can only contain "_", "-", ".", "/", and alphanumeric characters.'
             )
         if validate is True or (validate is None and not settings.offline_mode):
             requests.get(str(self.homepage)).raise_for_status()
