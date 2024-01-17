@@ -244,7 +244,7 @@ class Branch:
         if not isinstance(name, str):
             raise TypeError("`name` must be a string.")
         self._name = name
-        if re.match(r"^[A-Za-z0-9_.-]+$", name) is None:
+        if re.match(r"^[A-Za-z0-9/_.-]+$", name) is None:
             raise ValueError(
                 'GitHub branch names can only contain "_", "-", ".", and alphanumeric characters.'
             )
