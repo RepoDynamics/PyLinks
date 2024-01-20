@@ -388,6 +388,7 @@ def _retry_on_exception(
         raise ValueError("`num_tries` must be a positive integer.")
 
     def retry_decorator(func):
+
         @wraps(func)
         def retry_wrapper(*args, **kwargs):
             curr_sleep_seconds = config.sleep_time_init
