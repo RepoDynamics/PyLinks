@@ -17,8 +17,8 @@ namespaces = true
 # ----------------------------------------- Project Metadata -------------------------------------
 #
 [project]
-version = "0.0.0.dev21"
-name = "pylinks"
+version = "0.0.0.dev22"
+name = "PyLinks"
 dependencies = [
     "requests >= 2.31.0, < 3",
 ]
