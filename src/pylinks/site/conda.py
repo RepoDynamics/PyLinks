@@ -7,11 +7,10 @@ from typing import Optional
 
 # Non-standard libraries
 import requests
-from pylinks import settings, url
-from pylinks.url import URL
+import pylinks as _pylinks
 
 
-BASE_URL = url(url="https://anaconda.org")
+BASE_URL = _pylinks.url.create(url="https://anaconda.org")
 
 
 class Package:
@@ -37,7 +36,7 @@ class Package:
             )
         self._name = name
         self._channel = channel
-        if validate is True or (validate is None and not settings.offline_mode):
+        if validate is True or (validate is None and not _pylinks.settings.offline_mode):
             requests.get(str(self.homepage)).raise_for_status()
 
     def __repr__(self):
@@ -57,7 +56,7 @@ class Package:
         return self._channel
 
     @property
-    def homepage(self) -> URL:
+    def homepage(self) -> _pylinks.url.URL:
         """URL of the package homepage."""
         return BASE_URL / self.channel / self.name
 

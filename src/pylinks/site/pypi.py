@@ -7,11 +7,10 @@ from typing import Optional
 
 # Non-standard libraries
 import requests
-from pylinks import settings, url
-from pylinks.url import URL
+import pylinks as _pylinks
 
 
-BASE_URL = url("https://pypi.org")
+BASE_URL = _pylinks.url.create("https://pypi.org")
 
 
 class Package:
@@ -34,7 +33,7 @@ class Package:
                 "Distribution name is invalid; see https://peps.python.org/pep-0508/#names."
             )
         self._name = name
-        if validate is True or (validate is None and not settings.offline_mode):
+        if validate is True or (validate is None and not _pylinks.settings.offline_mode):
             requests.get(str(self.homepage)).raise_for_status()
 
     @property
@@ -43,7 +42,7 @@ class Package:
         return self._name
 
     @property
-    def homepage(self) -> URL:
+    def homepage(self) -> _pylinks.url.URL:
         """URL of the package homepage."""
         return BASE_URL / "project" / self.name
 

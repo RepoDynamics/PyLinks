@@ -3,7 +3,7 @@ import re
 import warnings
 
 # Non-standard libraries
-import pylinks
+import pylinks as _pylinks
 
 
 class Orcid:
@@ -20,7 +20,7 @@ class Orcid:
     @property
     def records(self) -> dict:
         if not self._data:
-            self._data = pylinks.request(
+            self._data = _pylinks.http.request(
                 url=f"https://pub.orcid.org/v3.0/{self.id}",
                 headers={"Accept": "application/json"},
                 response_type="json",

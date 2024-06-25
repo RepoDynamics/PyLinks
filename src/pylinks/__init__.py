@@ -11,7 +11,5 @@ but can be used directly from the root. It returns a URL object, also defined in
 Other available modules offer shortcuts for creating useful URLs for popular online services.
 """
 
-from ._settings import settings
-from .url import url
-from .http import request, download, graphql_query
-from . import api, site
+from pylinks._settings import settings
+from pylinks import url, http, api, site, exceptions

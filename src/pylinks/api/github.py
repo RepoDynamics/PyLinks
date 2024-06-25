@@ -5,16 +5,15 @@ import re
 import mimetypes
 
 # Non-standard libraries
-import pylinks
-from pylinks import request, url, graphql_query
+import pylinks as _pylinks
 
 
 class GitHub:
 
     def __init__(self, token: Optional[str] = None):
         self._endpoint = {
-            "api": url("https://api.github.com"),
-            "upload": url("https://uploads.github.com"),
+            "api": _pylinks.url.create("https://api.github.com"),
+            "upload": _pylinks.url.create("https://uploads.github.com"),
         }
         self._token = token
         self._headers = {"X-GitHub-Api-Version": "2022-11-28"}
@@ -31,7 +30,7 @@ class GitHub:
         extra_headers: dict | None = None,
     ) -> dict:
         headers = self._headers | extra_headers if extra_headers else self._headers
-        response = graphql_query(
+        response = _pylinks.http.graphql_query(
             url=self._endpoint["api"] / "graphql",
             query=f"{{{query}}}",
             headers=headers,
@@ -50,7 +49,7 @@ class GitHub:
             f'mutation($mutationInput:{mutation_input_name}!) '
             f'{{{mutation_name}(input:$mutationInput) {{{mutation_payload}}}}}'
         )
-        response = graphql_query(
+        response = _pylinks.http.graphql_query(
             url=self._endpoint["api"] / "graphql",
             query=query,
             variables={"mutationInput": mutation_input},
@@ -69,7 +68,7 @@ class GitHub:
         endpoint: Literal['api', 'upload'] = "api"
     ):
         headers = self._headers | extra_headers if extra_headers else self._headers
-        return request(
+        return _pylinks.http.request(
             verb=verb,
             url=self._endpoint[endpoint] / query,
             headers=headers,
@@ -328,7 +327,7 @@ class Repo:
                 if entry["type"] == "file":
                     filename = Path(entry["path"]).name
                     full_download_path = download_path / filename
-                    pylinks.download(
+                    _pylinks.http.download(
                         url=entry["download_url"], filepath=full_download_path, create_dirs=create_dirs
                     )
                     final_download_paths.append(full_download_path)
@@ -362,7 +361,7 @@ class Repo:
             full_download_path = download_path / download_filename
         else:
             full_download_path = download_path / Path(content["path"]).name
-        pylinks.download(
+        _pylinks.http.download(
             url=content["download_url"],
             filepath=full_download_path,
             create_dirs=create_dirs,
@@ -390,11 +389,6 @@ class Repo:
 
     def discussion_categories(self) -> list[dict[str, str]]:
         """Get discussion categories for a repository.
-
-        Parameters
-        ----------
-        access_token : str
-            GitHub access token.
 
         Returns
         -------

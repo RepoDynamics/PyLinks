@@ -14,7 +14,7 @@ class URL:
     def __init__(
         self,
         base: str,
-        queries: Optional[dict[str, str | bytes | None]] = None,
+        queries: Optional[dict[str, str | bytes | bool | None]] = None,
         fragment: Optional[str] = None,
         quote_safe: Optional[str] = "",
         query_delimiter: str = "&",
@@ -142,7 +142,7 @@ class URL:
         webbrowser.open(url=str(self), new=new, autoraise=autoraise)
 
 
-def url(
+def create(
     url: str,
     queries: Optional[dict[str, str | bytes | None]] = None,
     fragment: Optional[str] = None,

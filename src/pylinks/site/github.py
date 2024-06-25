@@ -7,11 +7,10 @@ from typing import Literal, Optional
 
 # Non-standard libraries
 import requests
-from pylinks import settings, url
-from pylinks.url import URL
+import pylinks as _pylinks
 
 
-BASE_URL = url(url="https://github.com")
+BASE_URL = _pylinks.url.create(url="https://github.com")
 
 
 class User:
@@ -33,7 +32,7 @@ class User:
                 "GitHub usernames can only contain alphanumeric characters and dashes."
             )
         self._name = name
-        if validate is True or (validate is None and not settings.offline_mode):
+        if validate is True or (validate is None and not _pylinks.settings.offline_mode):
             requests.get(str(self.homepage)).raise_for_status()
         return
 
@@ -49,7 +48,7 @@ class User:
         return self._name
 
     @property
-    def homepage(self) -> URL:
+    def homepage(self) -> _pylinks.url.URL:
         """URL of the GitHub user's homepage."""
         return BASE_URL / self.name
 
@@ -88,7 +87,7 @@ class Repo:
             raise ValueError(
                 'GitHub repository names can only contain "_", "-", ".", and alphanumeric characters.'
             )
-        if validate is True or (validate is None and not settings.offline_mode):
+        if validate is True or (validate is None and not _pylinks.settings.offline_mode):
             requests.get(str(self.homepage)).raise_for_status()
         return
 
@@ -109,11 +108,11 @@ class Repo:
         return self._name
 
     @property
-    def homepage(self) -> URL:
+    def homepage(self) -> _pylinks.url.URL:
         """URL of the repository's homepage."""
         return self.user.homepage / self.name
 
-    def workflow(self, filename: str) -> URL:
+    def workflow(self, filename: str) -> _pylinks.url.URL:
         """
         URL of a GitHub Actions workflow in the repository.
 
@@ -124,7 +123,7 @@ class Repo:
         """
         return self.homepage / "actions/workflows" / filename
 
-    def workflow_run(self, run_id: str) -> URL:
+    def workflow_run(self, run_id: str) -> _pylinks.url.URL:
         """
         URL of the summary page of a specific GitHub Actions workflow run in the repository.
 
@@ -137,7 +136,7 @@ class Repo:
 
     def pr_issues(
         self, pr: bool = True, closed: Optional[bool] = None, label: Optional[str] = None
-    ) -> URL:
+    ) -> _pylinks.url.URL:
         """
         URL of pull requests or issues in the repository.
 
@@ -162,11 +161,11 @@ class Repo:
             url.queries["q"] += f"+label:{label}"
         return url
 
-    def commit(self, commit_hash: str) -> URL:
+    def commit(self, commit_hash: str) -> _pylinks.url.URL:
         """URL of a specific commit in the repository."""
         return self.homepage / "commit" / commit_hash
 
-    def releases(self, tag: Optional[str | Literal["latest"]] = None) -> URL:
+    def releases(self, tag: Optional[str | Literal["latest"]] = None) -> _pylinks.url.URL:
         """
         URL of the releases overview page, or a specific release.
 
@@ -186,11 +185,24 @@ class Repo:
         return base_url / "tag" / tag
 
     @property
-    def commits(self) -> URL:
+    def commits(self) -> _pylinks.url.URL:
         """URL of commits page."""
         return self.homepage / "commits"
 
-    def discussions(self, category: Optional[str] = None) -> URL:
+    def compare(self, base: str, head: str) -> _pylinks.url.URL:
+        """
+        URL of a comparison between two references, i.e., branches, tags, or hashes.
+
+        Parameters
+        ----------
+        base : str
+            The base reference.
+        head : str
+            The head reference.
+        """
+        return self.homepage / "compare" / f"{base}...{head}"
+
+    def discussions(self, category: Optional[str] = None) -> _pylinks.url.URL:
         """
         URL of discussions page, or a specific discussion category page.
 
@@ -248,7 +260,7 @@ class Branch:
             raise ValueError(
                 'GitHub branch names can only contain "_", "-", ".", "/", and alphanumeric characters.'
             )
-        if validate is True or (validate is None and not settings.offline_mode):
+        if validate is True or (validate is None and not _pylinks.settings.offline_mode):
             requests.get(str(self.homepage)).raise_for_status()
         return
 
@@ -258,7 +270,7 @@ class Branch:
         return self._repo
 
     @property
-    def homepage(self) -> URL:
+    def homepage(self) -> _pylinks.url.URL:
         """URL of the branch's homepage."""
         return self.repo.homepage / "tree" / self.name
 
@@ -267,7 +279,7 @@ class Branch:
         """Name of the branch."""
         return self._name
 
-    def workflow(self, filename: str) -> URL:
+    def workflow(self, filename: str) -> _pylinks.url.URL:
         """
         URL of a GitHub Actions workflow for this specific branch.
 
@@ -280,11 +292,11 @@ class Branch:
         url.queries = {"query": f"branch:{self.name}"}
         return url
 
-    def file(self, filename: str, raw: bool = False) -> URL:
+    def file(self, filename: str, raw: bool = False) -> _pylinks.url.URL:
         """URL of a specific file in the branch."""
         if raw:
             return (
-                url("https://raw.githubusercontent.com")
+                _pylinks.url.create("https://raw.githubusercontent.com")
                 / self.repo.user.name
                 / self.repo.name
                 / self.name
@@ -293,7 +305,7 @@ class Branch:
         return self.homepage / filename
 
     @property
-    def commits(self) -> URL:
+    def commits(self) -> _pylinks.url.URL:
         """URL of commits page for this branch."""
         return self.repo.homepage / "commits" / self.name
 

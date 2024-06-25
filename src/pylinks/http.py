@@ -20,7 +20,7 @@ import time
 from functools import wraps
 from pathlib import Path
 import requests
-from pylinks import exceptions
+import pylinks as _pylinks
 
 
 class RetryConfig(NamedTuple):
@@ -73,7 +73,7 @@ class HTTPRequestRetryConfig(NamedTuple):
 
 
 def request(
-    url: str,
+    url: str | _pylinks.url.URL,
     verb: Union[str, Literal["GET", "POST", "PUT", "PATCH", "OPTIONS", "DELETE"]] = "GET",
     params: Optional[Union[dict, List[tuple], bytes]] = None,
     data: Optional[Union[dict, List[tuple], bytes]] = None,
@@ -189,7 +189,7 @@ def request(
             else _retry_on_exception(
                 get_response,
                 config=retry_config.config_status,
-                catch=exceptions.WebAPITemporaryStatusCodeError,
+                catch=_pylinks.exceptions.WebAPITemporaryStatusCodeError,
             )
         )
         # Call the (decorated or non-decorated) response function.
@@ -212,7 +212,7 @@ def request(
         if response_verifier is None or response_verifier(response_value):
             return response_value
         # otherwise raise
-        raise exceptions.WebAPIValueError(response_value=response_value, response_verifier=response_verifier)
+        raise _pylinks.exceptions.WebAPIValueError(response_value=response_value, response_verifier=response_verifier)
 
     # Depending on specifications in argument `retry_config`, either decorate `get_response_value`
     # with `retry_on_exception`, or leave it as is.
@@ -226,7 +226,7 @@ def request(
         else _retry_on_exception(
             get_response_value,
             config=retry_config.config_response,
-            catch=exceptions.WebAPIValueError,
+            catch=_pylinks.exceptions.WebAPIValueError,
         )
     )
     # Call the (decorated or non-decorated) response-value function and return.
@@ -266,9 +266,9 @@ def graphql_query(
     response = request(**args)
     if isinstance(response, dict):
         if "errors" in response:
-            raise exceptions.WebAPIError(response)
+            raise _pylinks.exceptions.WebAPIError(response)
         elif "data" not in response:
-            raise exceptions.WebAPIError(response)
+            raise _pylinks.exceptions.WebAPIError(response)
         else:
             response = response["data"]
     return response
@@ -352,9 +352,9 @@ def _raise_for_status_code(
         temporary_error_status_codes is not None
         and response.status_code in temporary_error_status_codes
     ):
-        raise exceptions.WebAPITemporaryStatusCodeError(response)
+        raise _pylinks.exceptions.WebAPITemporaryStatusCodeError(response)
     if error_status_code_range[0] <= response.status_code <= error_status_code_range[1]:
-        raise exceptions.WebAPIPersistentStatusCodeError(response)
+        raise _pylinks.exceptions.WebAPIPersistentStatusCodeError(response)
     return
 
 
