@@ -369,7 +369,7 @@ class Repo:
         )
         return full_download_path
 
-    def semantic_versions(self, tag_prefix: str = "v") -> list[tuple[int, int, int]]:
+    def semantic_versions(self, tag_prefix: str = "v") -> list[str]:
         """
         Get a list of all tags from a GitHub repository that represent SemVer version numbers,
         i.e. 'X.Y.Z' where X, Y, and Z are integers.
@@ -385,7 +385,7 @@ class Repo:
             `[(0, 1, 0), (0, 1, 1), (0, 2, 0), (1, 0, 0), (1, 1, 0)]`
         """
         tags = self.tag_names(pattern=rf"^{tag_prefix}(\d+\.\d+\.\d+)$")
-        return sorted([tuple(map(int, tag[0].split("."))) for tag in tags])
+        return sorted((tag[0] for tag in tags), key=lambda x: tuple(map(int, x.split("."))))
 
     def discussion_categories(self) -> list[dict[str, str]]:
         """Get discussion categories for a repository.
@@ -846,6 +846,12 @@ class Repo:
         return output
 
     def repo_topics_replace(self, topics: list[str]):
+        """Replace all repository topics.
+
+        References
+        ----------
+        - [GitHub API Docs](https://docs.github.com/en/rest/repos/repos?apiVersion=2022-11-28#replace-all-repository-topics)
+        """
         topic_pattern = re.compile(r"^[a-z0-9][a-z0-9\-]*$")
         for topic in topics:
             if not isinstance(topic, str):
@@ -1501,6 +1507,21 @@ class Repo:
         if not data:
             raise ValueError("At least one of the ruleset parameters must be specified.")
         return self._rest_query(query=f"rulesets/{ruleset_id}", verb="PUT", json=data)
+
+    def ruleset_delete(self, ruleset_id: int) -> dict:
+        """
+        Delete a ruleset.
+
+        Parameters
+        ----------
+        ruleset_id : int
+            The ID of the ruleset.
+
+        References
+        ----------
+        - [GitHub API Docs](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28#delete-a-repository-ruleset)
+        """
+        return self._rest_query(query=f"rulesets/{ruleset_id}", verb="DELETE")
 
     def actions_permissions_workflow_default(self) -> dict:
         """
