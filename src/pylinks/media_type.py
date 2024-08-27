@@ -1,9 +1,20 @@
-"""Create and parse Media Types."""
+"""Create and parse [media types](https://en.wikipedia.org/wiki/Media_type).
 
+References
+----------
+- [Offical IANA Media Types](https://www.iana.org/assignments/media-types/media-types.xml)
+- [Common MIME types](https://developer.mozilla.org/en-US/docs/Web/HTTP/Basics_of_HTTP/MIME_types/Common_types)
+- [Database of mime types](https://github.com/jshttp/mime-db/tree/master)
+- [Database of mime types](https://github.com/patrickmccallum/mimetype-io/blob/master/src/mimeData.json)
+- [JSON list of file extensions with their mime types](https://github.com/micnic/mime.json)
+- [Python mimetypes](https://docs.python.org/3/library/mimetypes.html)
+"""
+
+import mimetypes as _mimetypes
 import dataclasses as _dataclasses
-import re
+import re as _re
 
-from pylinks.exception.media_type import PyLinksMediaTypeParseError as _PyLinksMediaTypeParseError
+from pylinks import exception as _exception
 
 
 @_dataclasses.dataclass
@@ -39,9 +50,9 @@ class MediaType:
     parameters: dict[str, str | None] = _dataclasses.field(default_factory=dict)
 
     def __str__(self) -> str:
-        suffixes = "+".join(self.suffixes)
+        suffixes = "".join(f"+{suffix}" for suffix in self.suffixes)
         if self.parameters:
-            joined =  "; ".join(f"{k}={v}" if v else k for k, v in self.parameters.items())
+            joined = "; ".join(f"{k}={v}" if v else k for k, v in self.parameters.items())
             params = f"; {joined}"
         else:
             params = ""
@@ -50,12 +61,22 @@ class MediaType:
 
 
 def parse(media_type: str) -> MediaType:
-    regex = re.compile(
-        r'^(?P<type>[\w\-]+)\/(?:(?P<tree>[\w\-]+)\.)?(?P<subtype>[\w\-.]+)(?P<suffixes>(\+[\w\-.]+)*)?(?:\s*;\s*(?P<parameters>.*))?$'
+    regex = _re.compile(
+        r"""
+            ^
+            (?P<type>[\w\-]+)
+            /
+            (?:(?P<tree>[\w\-]+)\.)?
+            (?P<subtype>[\w\-.]+)
+            (?P<suffixes>(\+[\w\-.]+)*)?
+            (?:\s*;\s*(?P<parameters>.*))?
+            $
+        """,
+        _re.VERBOSE
     )
     match = regex.match(media_type)
     if not match:
-        raise _PyLinksMediaTypeParseError(
+        raise _exception.media_type.PyLinksMediaTypeParseError(
             f"The input does not match the regex pattern '{regex.pattern}'.",
             media_type
         )
@@ -69,3 +90,22 @@ def parse(media_type: str) -> MediaType:
     mime["parameters"] = params
     return MediaType(**mime)
 
+
+def guess_from_uri(uri: str) -> MediaType:
+    """Guess the media type of a given URI (e.g. URL or filepath).
+
+    Parameters
+    ----------
+    uri : str
+        The URI to guess the media type from.
+
+    Returns
+    -------
+    MediaType
+        The guessed media type.
+    """
+    uri = str(uri)
+    mimetype = _mimetypes.guess_type(uri)[0]
+    if mimetype is None:
+        raise _exception.media_type.PyLinksMediaTypeGuessError(uri)
+    return parse(mimetype)

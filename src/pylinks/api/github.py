@@ -99,8 +99,9 @@ class User:
         extra_headers: dict | None = None,
         endpoint: Literal['api', 'upload'] = "api"
     ):
+        query_part = f"/{query}" if query else ""
         return self._github.rest_query(
-            query=f"users/{self.username}/{query}",
+            query=f"users/{self.username}{query_part}",
             verb=verb,
             data=data,
             json=json,
@@ -143,8 +144,9 @@ class Repo:
         extra_headers: dict | None = None,
         endpoint: Literal['api', 'upload'] = "api"
     ):
+        query_part = f"/{query}" if query else ""
         return self._github.rest_query(
-            f"repos/{self._username}/{self._name}/{query}",
+            f"repos/{self._username}/{self._name}{query_part}",
             verb=verb,
             data=data,
             json=json,

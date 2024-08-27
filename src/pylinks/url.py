@@ -1,7 +1,6 @@
 """Create and modify URLs."""
 
-
-# Standard libraries
+from __future__ import annotations
 import re
 import urllib
 import webbrowser
@@ -59,14 +58,9 @@ class URL:
         Add a path at the end of the base URL (while preserving the query string and fragment),
         and return a new copy.
         """
-        if not isinstance(path, str):
-            raise TypeError("Adding a path can only be performed on strings.")
-        if path.startswith("/"):
-            path = path[1:]
-        if path.endswith("/"):
-            path = path[:-1]
+        path = str(path or "")
         return URL(
-            base=f"{self.base}/{path}",
+            base=f"{self.base.removesuffix("/")}/{path.removeprefix("/")}" if path else self.base,
             queries=self.queries.copy(),
             fragment=self.fragment,
             query_delimiter=self.query_delimiter,
@@ -111,19 +105,7 @@ class URL:
                 queries.append(f"{q_key}={q_val}")
         return self.query_delimiter.join(queries)
 
-    def add_path(self, path: str) -> None:
-        """
-        Add a path to the end of the base URL, while preserving the query string and fragment.
-        This modifies the current instance in place.
-        """
-        if path.startswith("/"):
-            path = path[1:]
-        if path.endswith("/"):
-            path = path[:-1]
-        self.base += f"/{path}"
-        return
-
-    def copy(self) -> "URL":
+    def copy(self) -> URL:
         """Create a new copy."""
         return self.__copy__()
 
@@ -172,7 +154,7 @@ def create(
         Delimiter for the query string.
     """
     base, base_queries, base_fragment = _process_url(url, query_delimiter=query_delimiter)
-    queries = base_queries | queries if queries else base_queries
+    queries = base_queries | (queries or {})
     fragment = fragment if fragment else base_fragment
     return URL(
         base=base,

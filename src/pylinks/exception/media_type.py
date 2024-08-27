@@ -9,3 +9,12 @@ class PyLinksMediaTypeParseError(_PyLinksException):
         self.message = message
         self.media_type = media_type
         return
+
+
+class PyLinksMediaTypeGuessError(_PyLinksException):
+    """Error guessing the media type of a data URI."""
+    def __init__(self, path: str):
+        msg = f"Failed to guess the media type of '{path}'."
+        super().__init__(message=msg)
+        self.path = path
+        return

@@ -1,3 +1,5 @@
+from pathlib import Path as _Path
+
 from pylinks.exception import PyLinksException as _PyLinksException
 
 

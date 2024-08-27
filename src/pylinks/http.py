@@ -150,24 +150,27 @@ def request(
 
     def get_response_value():
         def get_response():
-            response = requests.request(
-                method=verb,
-                url=str(url),
-                params=params,
-                data=data,
-                headers=headers,
-                cookies=cookies,
-                files=files,
-                auth=auth,
-                timeout=timeout,
-                allow_redirects=allow_redirects,
-                proxies=proxies,
-                hooks=hooks,
-                stream=stream,
-                verify=verify,
-                cert=cert,
-                json=json,
-            )
+            try:
+                response = requests.request(
+                    method=verb,
+                    url=str(url),
+                    params=params,
+                    data=data,
+                    headers=headers,
+                    cookies=cookies,
+                    files=files,
+                    auth=auth,
+                    timeout=timeout,
+                    allow_redirects=allow_redirects,
+                    proxies=proxies,
+                    hooks=hooks,
+                    stream=stream,
+                    verify=verify,
+                    cert=cert,
+                    json=json,
+                )
+            except requests.exceptions.RequestException as e:
+                raise _pylinks.exceptions.WebAPIRequestError(e) from e
             _raise_for_status_code(
                 response=response,
                 temporary_error_status_codes=(
