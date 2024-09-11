@@ -12,4 +12,4 @@ Other available modules offer shortcuts for creating useful URLs for popular onl
 """
 
 from pylinks._settings import settings
-from pylinks import url, http, api, site, exceptions, uri, media_type
+from pylinks import url, http, api, site, exceptions, uri, media_type, string
