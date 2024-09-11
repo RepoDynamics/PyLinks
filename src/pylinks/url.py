@@ -93,14 +93,14 @@ class URL:
         for key, val in self.queries.items():
             if val is None:
                 continue
-            q_key = urllib.parse.quote(str(key), safe=self.quote_safe)
+            q_key = urllib.parse.quote(urllib.parse.unquote(str(key)), safe=self.quote_safe)
             if isinstance(val, bool) and val is True:
                 queries.append(q_key)
             else:
                 q_val = (
                     val.decode("utf8")
                     if isinstance(val, bytes)
-                    else urllib.parse.quote(str(val), safe=self.quote_safe)
+                    else urllib.parse.quote(urllib.parse.unquote(str(val)), safe=self.quote_safe)
                 )
                 queries.append(f"{q_key}={q_val}")
         return self.query_delimiter.join(queries)
