@@ -1,13 +1,20 @@
-from pathlib import Path as _Path
+import mdit as _mdit
 
-from pylinks.exception import PyLinksException as _PyLinksException
+from pylinks.exception import PyLinksError as _PyLinksError
 
 
-class PyLinksDataURIParseError(_PyLinksException):
+class PyLinksDataURIParseError(_PyLinksError):
     """Error parsing a data URI."""
-    def __init__(self, message: str, data_uri: str):
-        msg = f"Failed to parse data URI '{data_uri}': {message}"
-        super().__init__(message=msg)
-        self.message = message
+    def __init__(self, problem: str, data_uri: str):
+        super().__init__(
+            title="Data URI Parse Error",
+            intro=_mdit.inline_container(
+                "Failed to parse data URI ",
+                _mdit.element.code_span(data_uri),
+                ". ",
+                problem,
+            )
+        )
+        self.problem = problem
         self.data_uri = data_uri
         return
