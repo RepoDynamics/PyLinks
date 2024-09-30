@@ -1510,7 +1510,7 @@ class Repo:
             raise ValueError("At least one of the ruleset parameters must be specified.")
         return self._rest_query(query=f"rulesets/{ruleset_id}", verb="PUT", json=data)
 
-    def ruleset_delete(self, ruleset_id: int) -> dict:
+    def ruleset_delete(self, ruleset_id: int) -> None:
         """
         Delete a ruleset.
 
@@ -1523,7 +1523,8 @@ class Repo:
         ----------
         - [GitHub API Docs](https://docs.github.com/en/rest/repos/rules?apiVersion=2022-11-28#delete-a-repository-ruleset)
         """
-        return self._rest_query(query=f"rulesets/{ruleset_id}", verb="DELETE")
+        self._rest_query(query=f"rulesets/{ruleset_id}", verb="DELETE")
+        return
 
     def actions_permissions_workflow_default(self) -> dict:
         """
