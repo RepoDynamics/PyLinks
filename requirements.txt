@@ -1,3 +1,3 @@
 requests >= 2.31.0, < 3
-ExceptionMan == 0.0.0.dev20
-MDit == 0.0.0.dev20
+ExceptionMan == 0.0.0.dev21
+MDit == 0.0.0.dev21
