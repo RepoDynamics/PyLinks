@@ -8,6 +8,8 @@ from typing import TYPE_CHECKING as _TYPE_CHECKING, NamedTuple as _NamedTuple
 import time
 from functools import wraps
 from pathlib import Path
+
+import mdit as _mdit
 import requests
 
 from pylinks.exception import api as _exception
@@ -273,10 +275,11 @@ def graphql_query(
         args["json"]["variables"] = variables
     response = request(**args)
     if isinstance(response, dict):
+        error_title = "GraphQL API Error"
         if "errors" in response:
-            raise _exception.WebAPIError(response)
+            raise _exception.GraphQLResponseError(response)
         elif "data" not in response:
-            raise _exception.WebAPIError(response)
+            raise _exception.GraphQLResponseError(response)
         else:
             response = response["data"]
     return response

@@ -2,9 +2,11 @@
 
 from __future__ import annotations as _annotations
 
+import json
 from typing import TYPE_CHECKING as _TYPE_CHECKING
 
 import mdit as _mdit
+import json as _json
 from pylinks.exception import PyLinksError
 
 if _TYPE_CHECKING:
@@ -90,6 +92,26 @@ class WebAPIValueError(WebAPIError):
         super().__init__(
             title="Web API Response Verification Error",
             intro=error_msg,
+        )
+        return
+
+
+class GraphQLResponseError(WebAPIError):
+    """
+    Exception class for GraphQL
+    """
+
+    def __init__(self, response: dict):
+        if "errors" in response:
+            intro = "GraphQL response contains errors."
+        elif "data" not in response:
+            intro = "GraphQL response does not contain data."
+        super().__init__(
+            title="GraphQL Response Error",
+            intro=intro,
+            details=_mdit.element.code_block(
+                json.dumps(response, indent=3), language="json", caption="GraphQL Response"
+            ),
         )
         return
 

@@ -17,12 +17,12 @@ namespaces = true
 # ----------------------------------------- Project Metadata -------------------------------------
 #
 [project]
-version = "0.0.0.dev39"
+version = "0.0.0.dev40"
 name = "PyLinks"
 dependencies = [
     "requests >= 2.31.0, < 3",
-    "ExceptionMan == 0.0.0.dev26",
-    "MDit == 0.0.0.dev26",
+    "ExceptionMan == 0.0.0.dev27",
+    "MDit == 0.0.0.dev27",
 ]
 requires-python = ">=3.10"
 
