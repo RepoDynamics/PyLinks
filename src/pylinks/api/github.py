@@ -9,6 +9,13 @@ import pylinks as _pylinks
 
 
 class GitHub:
+    """GitHub API
+
+    References
+    ----------
+    - [OpenAPI Description](https://github.com/github/rest-api-description)
+    - [GraphQL API Documentation](https://docs.github.com/en/graphql)
+    """
 
     def __init__(self, token: Optional[str] = None):
         self._endpoint = {

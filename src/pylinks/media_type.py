@@ -109,3 +109,7 @@ def guess_from_uri(uri: str) -> MediaType:
     if mimetype is None:
         raise _exception.media_type.PyLinksMediaTypeGuessError(uri)
     return parse(mimetype)
+
+# TODO: Add function to guess from file
+# Refs:
+# - https://pypi.org/project/python-magic/
