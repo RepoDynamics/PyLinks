@@ -31,6 +31,10 @@ class GitHub:
     def user(self, username) -> "User":
         return User(username=username, token=self._token)
 
+    def user_from_id(self, user_id) -> "User":
+        user_data = self.rest_query(f"user/{user_id}")
+        return User(username=user_data["login"], token=self._token)
+
     def graphql_query(
         self,
         query: str,
@@ -605,6 +609,35 @@ class Repo:
         - [GitHub API Docs](https://docs.github.com/en/rest/pulls/pulls?apiVersion=2022-11-28#get-a-pull-request)
         """
         return self._rest_query(f"pulls/{number}")
+
+    def pull_commits(self, number: int) -> list[dict]:
+        """
+        Get a list of commits for a pull request.
+
+        Parameters
+        ----------
+        number : int
+            Pull request number.
+
+        Returns
+        -------
+        list[dict]
+            A list of commits as dictionaries.
+            Commits are ordered by ascending commit date.
+
+        References
+        ----------
+        - [GitHub API Docs](https://docs.github.com/en/rest/pulls/commits?apiVersion=2022-11-28#list-commits-on-a-pull-request)
+        """
+        commits = []
+        page = 1
+        while True:
+            response = self._rest_query(f"pulls/{number}/commits?per_page=100&page={page}")
+            commits.extend(response)
+            page += 1
+            if len(response) < 100:
+                break
+        return commits
 
     def pull_create(
         self,
