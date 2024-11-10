@@ -1042,8 +1042,7 @@ class Repo:
         generate_release_notes: bool = False,
         make_latest: Literal['true', 'false', 'legacy'] = 'true'
     ):
-        """
-        Create a new release.
+        """Create a new release.
 
         Parameters
         ----------
@@ -1101,10 +1100,10 @@ class Repo:
         release_id: int,
         filepath: str | Path,
         mime_type: str = "",
+        name: str = "",
         label: str = "",
     ) -> dict:
-        """
-        Upload a file as an asset to a release.
+        """Upload a file as an asset to a release.
 
         Parameters
         ----------
@@ -1132,7 +1131,7 @@ class Repo:
                     f"Could not guess MIME type of file '{filepath}'. Please provide it as input argument."
                 )
         headers = {"Content-Type": mime_type}
-        query = f"releases/{release_id}/assets?name={filepath.name}"
+        query = f"releases/{release_id}/assets?name={name or filepath.name}"
         if label:
             query += f"&label={label}"
         return self._rest_query(
