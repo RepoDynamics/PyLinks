@@ -277,9 +277,9 @@ def graphql_query(
     if isinstance(response, dict):
         error_title = "GraphQL API Error"
         if "errors" in response:
-            raise _exception.GraphQLResponseError(response)
+            raise _exception.GraphQLResponseError(response, query)
         elif "data" not in response:
-            raise _exception.GraphQLResponseError(response)
+            raise _exception.GraphQLResponseError(response, query)
         else:
             response = response["data"]
     return response
