@@ -101,7 +101,7 @@ class GraphQLResponseError(WebAPIError):
     Exception class for GraphQL
     """
 
-    def __init__(self, response: dict):
+    def __init__(self, response: dict, query: str):
         if "errors" in response:
             intro = "GraphQL response contains errors."
         elif "data" not in response:
@@ -109,10 +109,16 @@ class GraphQLResponseError(WebAPIError):
         super().__init__(
             title="GraphQL Response Error",
             intro=intro,
-            details=_mdit.element.code_block(
-                json.dumps(response, indent=3), language="json", caption="GraphQL Response"
-            ),
+            details=_mdit.block_container(
+                _mdit.element.code_block(
+                    json.dumps(response, indent=3), language="json", caption="GraphQL Response"
+                ),
+                _mdit.element.code_block(
+                    query, language="graphql", caption="GraphQL Query"
+                ),
+            )
         )
+        self.query = query
         return
 
 
