@@ -166,6 +166,16 @@ class Repo:
             endpoint=endpoint
         )
 
+    def _graphql_query(
+        self,
+        payload: str,
+        extra_headers: dict | None = None,
+    ) -> dict:
+        return self._github.graphql_query(
+            query=f'repository(name: "{self._name}", owner: "{self._username}") {{{payload}}}',
+            extra_headers=extra_headers,
+        )["repository"]
+
     @property
     def username(self) -> str:
         return self._username
@@ -412,13 +422,9 @@ class Repo:
         - [GitHub Docs](https://docs.github.com/en/graphql/guides/using-the-graphql-api-for-discussions)
         -
         """
-        payload = "{discussionCategories(first: 100) {edges {node {name, slug, id}}}}"
-        query = f'repository(name: "{self._name}", owner: "{self._username}") {payload}'
-        data = self._github.graphql_query(query)
-        discussions = [
-            entry["node"]
-            for entry in data["repository"]["discussionCategories"]["edges"]
-        ]
+        payload = "discussionCategories(first: 100) {edges {node {name, slug, id}}}"
+        data = self._graphql_query(payload)
+        discussions = [entry["node"] for entry in data["discussionCategories"]["edges"]]
         return discussions
 
     def issue(self, number: int) -> dict:
@@ -610,7 +616,12 @@ class Repo:
         """
         return self._rest_query(f"pulls/{number}")
 
-    def pull_commits(self, number: int) -> list[dict]:
+    def pull_commits(
+        self,
+        number: int,
+        count: int = 0,
+        sort: Literal["first", "last"] = "last",
+    ) -> list[dict]:
         """
         Get a list of commits for a pull request.
 
@@ -629,6 +640,9 @@ class Repo:
         ----------
         - [GitHub API Docs](https://docs.github.com/en/rest/pulls/commits?apiVersion=2022-11-28#list-commits-on-a-pull-request)
         """
+        payload = f"pullRequest(number: {number})"
+        commits = "{{commits()"
+
         commits = []
         page = 1
         while True:
@@ -638,6 +652,8 @@ class Repo:
             if len(response) < 100:
                 break
         return commits
+
+
 
     def pull_create(
         self,
@@ -1683,9 +1699,8 @@ class Repo:
         ----------
         - [GitHub API Docs](https://docs.github.com/en/graphql/reference/objects#branchprotectionruleconnection)
         """
-        payload = "{branchProtectionRules(first: 100) {nodes {id, pattern}}}"
-        query = f'repository(name: "{self._name}", owner: "{self._username}") {payload}'
-        data = self._github.graphql_query(query)
+        payload = "branchProtectionRules(first: 100) {nodes {id, pattern}}"
+        data = self._graphql_query(payload)
         return data["repository"]["branchProtectionRules"]["nodes"]
 
     def branch_protection_rule_create(
