@@ -1,11 +1,15 @@
 # Standard libraries
-from typing import Optional, Literal
+from __future__ import annotations as _annotations
+from typing import TYPE_CHECKING as _TYPE_CHECKING
 from pathlib import Path
 import re
 import mimetypes
 
 # Non-standard libraries
 import pylinks as _pylinks
+
+if _TYPE_CHECKING:
+    from typing import Optional, Literal, Any
 
 
 class GitHub:
@@ -38,13 +42,22 @@ class GitHub:
     def graphql_query(
         self,
         query: str,
+        variables: dict[str, tuple[Any, str, bool]] | None = None,
         extra_headers: dict | None = None,
     ) -> dict:
         headers = self._headers | extra_headers if extra_headers else self._headers
+        if variables:
+            args = ", ".join(
+                f"${name}:{typ}{"!" if required else ""}" for name, (_, typ, required) in variables.items()
+            )
+            sig = f"query({args})"
+        else:
+            sig = "query"
         response = _pylinks.http.graphql_query(
             url=self._endpoint["api"] / "graphql",
-            query=f"{{{query}}}",
+            query=f"{sig} {{{query}}}",
             headers=headers,
+            variables={name: value for name, (value, _, _) in variables.items()} if variables else None
         )
         return response
 
@@ -169,10 +182,12 @@ class Repo:
     def _graphql_query(
         self,
         payload: str,
+        variables: dict[str, tuple[Any, str, bool]] | None = None,
         extra_headers: dict | None = None,
     ) -> dict:
         return self._github.graphql_query(
             query=f'repository(name: "{self._name}", owner: "{self._username}") {{{payload}}}',
+            variables=variables,
             extra_headers=extra_headers,
         )["repository"]
 
@@ -620,6 +635,8 @@ class Repo:
         self,
         number: int,
         count: int = 0,
+        cursor_before: str | None = None,
+        cursor_after: str | None = None,
         sort: Literal["first", "last"] = "last",
     ) -> list[dict]:
         """
@@ -640,20 +657,52 @@ class Repo:
         ----------
         - [GitHub API Docs](https://docs.github.com/en/rest/pulls/commits?apiVersion=2022-11-28#list-commits-on-a-pull-request)
         """
-        payload = f"pullRequest(number: {number})"
-        commits = "{{commits()"
+        def post_process():
+            out = []
+            for datum in data:
+                commits = datum["pullRequest"]["commits"]["nodes"]
+                if sort == "last":
+                    commits = reversed(commits)
+                for commit in commits:
+                    commit["commit"]["authors"] = commit["commit"]["authors"]["nodes"]
+                    out.append(commit)
+            return out
 
-        commits = []
-        page = 1
+        git_actor_fields = "{name, email, date user {id, login}}"
+        commit_fields = f"{{abbreviatedOid, additions, deletions, authors(first: 100) {{nodes {git_actor_fields}}}, committer {git_actor_fields}, authoredByCommitter, authoredDate, committedDate, message, messageBody, messageHeadline, oid, id, resourcePath, url}}"
+        page_info_fields = "pageInfo {startCursor, endCursor, hasNextPage, hasPreviousPage}"
+        commits_args = ["after: $after", "before: $before", f"{sort}: {100 if count <= 0 else min(count, 100)}"]
+        commits_fields = f"nodes {{id, resourcePath, url, commit {commit_fields} }}"
+        commits_sig = f"commits({", ".join(commits_args)})"
+        payload = f"pullRequest(number: {number}) {{ {commits_sig} {{ {commits_fields} {page_info_fields} }} }}"
+        variables = {
+            "after": (cursor_after, "String", False),
+            "before": (cursor_before, "String", False),
+        }
+        data = [self._graphql_query(payload, variables)]
+        total_downloaded = 100
         while True:
-            response = self._rest_query(f"pulls/{number}/commits?per_page=100&page={page}")
-            commits.extend(response)
-            page += 1
-            if len(response) < 100:
-                break
-        return commits
+            page_info = data[-1]["pullRequest"]["commits"]["pageInfo"]
+            if count <= 0:
+                must_continue = page_info["hasNextPage" if sort == "first" else "hasPreviousPage"]
+                if not must_continue:
+                    return post_process()
+            elif total_downloaded >= count:
+                return post_process()
+            else:
+                variables[sort] = page_info["endCursor" if sort == "first" else "startCursor"]
+                data.append(self._graphql_query(payload, variables))
+                total_downloaded += 100
 
-
+        # commits = []
+        # page = 1
+        # while True:
+        #     response = self._rest_query(f"pulls/{number}/commits?per_page=100&page={page}")
+        #     commits.extend(response)
+        #     page += 1
+        #     if len(response) < 100:
+        #         break
+        # return commits
 
     def pull_create(
         self,
@@ -1046,15 +1095,22 @@ class Repo:
             raise ValueError("At least one of 'new_name', 'color', or 'description' must be specified.")
         return self._rest_query(query=f"labels/{name}", verb="PATCH", json=data)
 
+    def release_get(self, release_id: int) -> dict:
+        return self._rest_query(query=f"releases/{release_id}")
+
+    def release_delete(self, release_id: int) -> None:
+        self._rest_query(query=f"releases/{release_id}", verb="DELETE", response_type=None)
+        return
+
     def release_create(
         self,
         tag_name: str,
-        name: str,
-        body: str,
-        target_commitish: str = "",
+        name: str | None = None,
+        body: str | None = None,
+        target_commitish: str | None = None,
         draft: bool = False,
         prerelease: bool = False,
-        discussion_category_name: str = "",
+        discussion_category_name: str | None = None,
         generate_release_notes: bool = False,
         make_latest: Literal['true', 'false', 'legacy'] = 'true'
     ):
@@ -1094,22 +1150,62 @@ class Repo:
         ----------
         [GitHub API Docs](https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#create-a-release)
         """
-        data = {
-            "tag_name": tag_name,
-            "draft": draft,
-            "prerelease": prerelease,
-            "generate_release_notes": generate_release_notes,
-            "make_latest": make_latest,
-        }
-        if name:
-            data["name"] = name
-        if body:
-            data["body"] = body
-        if target_commitish:
-            data["target_commitish"] = target_commitish
-        if discussion_category_name:
-            data["discussion_category_name"] = discussion_category_name
-        return self._rest_query(query="releases", verb="POST", json=data)
+        data = {k: v for k, v in locals().items() if k != "self" and v is not None}
+        return self._rest_query(query=f"releases", verb="POST", json=data)
+
+    def release_update(
+        self,
+        release_id: int,
+        tag_name: str | None = None,
+        name: str | None = None,
+        body: str | None = None,
+        target_commitish: str | None = None,
+        draft: bool | None = None,
+        prerelease: bool | None = None,
+        discussion_category_name: str | None = None,
+        make_latest: Literal['true', 'false', 'legacy'] | None = None
+    ):
+        """Update a release.
+
+        Parameters
+        ----------
+        tag_name : str
+            The name of the tag.
+        name : str
+            The name of the release.
+        body : str
+            The body of the release post, i.e. text describing the release.
+        target_commitish : str, optional
+            The commitish value that determines where the Git tag is created from.
+            Can be any branch or commit SHA. Unused if the Git tag already exists.
+            The default is the repository's default branch.
+        draft : bool, optional
+            `True` to create a draft (unpublished) release, `False` to create a published one.
+        prerelease : bool, default: False
+            `True` to identify the release as a prerelease, `False` to identify it as a full release.
+        discussion_category_name : str, optional
+            The name of the discussion category for the release, to be created and linked to the release.
+            The value must be a category that already exists in the repository.
+        make_latest : {'true', 'false', 'legacy'}, optional
+            Whether this release should be set as the latest release for the repository.
+            Drafts and prereleases cannot be set as latest.
+            Defaults to 'true' for newly published releases.
+            'legacy' specifies that the latest release should be determined based on
+            the release creation date and higher semantic version.
+
+        References
+        ----------
+        [GitHub API Docs](https://docs.github.com/en/rest/releases/releases?apiVersion=2022-11-28#create-a-release)
+        """
+        data = {k: v for k, v in locals().items() if k not in ("self", "release_id") and v is not None}
+        return self._rest_query(query=f"releases/{release_id}", verb="PATCH", json=data)
+
+    def release_asset_list(self, release_id: int) -> list[dict]:
+        return self._rest_query(query=f"releases/{release_id}/assets")
+
+    def release_asset_delete(self, asset_id: int) -> None:
+        self._rest_query(query=f"releases/assets/{asset_id}", verb="DELETE", response_type=None)
+        return
 
     def release_asset_upload(
         self,
@@ -1701,7 +1797,7 @@ class Repo:
         """
         payload = "branchProtectionRules(first: 100) {nodes {id, pattern}}"
         data = self._graphql_query(payload)
-        return data["repository"]["branchProtectionRules"]["nodes"]
+        return data["branchProtectionRules"]["nodes"]
 
     def branch_protection_rule_create(
         self,
