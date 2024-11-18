@@ -101,6 +101,14 @@ class Zenodo:
             verb="GET",
         )
 
+    def deposition_delete(self, deposition_id: str | int):
+        self.rest_query(
+            f"deposit/depositions/{deposition_id}",
+            verb="DELETE",
+            response_type=None
+        )
+        return
+
     def deposition_create(self, metadata: dict | None = None) -> dict:
         """Create a new deposition.
 
