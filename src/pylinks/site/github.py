@@ -189,6 +189,9 @@ class Repo:
         """URL of commits page."""
         return self.homepage / "commits"
 
+    def contributors(self) -> _pylinks.url.URL:
+        return self.homepage / "graphs" / "contributors"
+
     def compare(self, base: str, head: str) -> _pylinks.url.URL:
         """
         URL of a comparison between two references, i.e., branches, tags, or hashes.
