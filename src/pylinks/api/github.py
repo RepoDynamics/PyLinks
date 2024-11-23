@@ -437,7 +437,7 @@ class Repo:
         - [GitHub Docs](https://docs.github.com/en/graphql/guides/using-the-graphql-api-for-discussions)
         -
         """
-        payload = "discussionCategories(first: 100) {edges {node {name, slug, id}}}"
+        payload = "discussionCategories(first: 100) {edges {node {name, slug, id, emoji, emojiHTML, createdAt, updatedAt, isAnswerable, description}}}"
         data = self._graphql_query(payload)
         discussions = [entry["node"] for entry in data["discussionCategories"]["edges"]]
         return discussions
