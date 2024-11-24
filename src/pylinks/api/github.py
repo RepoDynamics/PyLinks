@@ -39,6 +39,83 @@ class GitHub:
         user_data = self.rest_query(f"user/{user_id}")
         return User(username=user_data["login"], token=self._token)
 
+    def search_code(self, query: str, max_results: int = 0):
+        results = {
+            "total_count": 0,
+            "incomplete_results": False,
+            "items": []
+        }
+        page = 1
+        while True:
+            response = self.rest_query(f"search/code?q={query}&per_page=100&page={page}")
+            results["total_count"] = response["total_count"]
+            results["incomplete_results"] = results["incomplete_results"] or response["incomplete_results"]
+            results["items"].extend(response["items"])
+            page += 1
+            if len(response["items"]) < 100 or (max_results and len(results["items"]) >= max_results):
+                break
+        return results
+
+    def search_code_graphql(
+        self,
+        query: str,
+        search_type: Literal["discussion", "issue", "repository", "user"],
+        payload: str,
+        count: int = 0,
+        cursor_before: str | None = None,
+        cursor_after: str | None = None,
+        sort: Literal["first", "last"] = "first",
+    ) -> list[dict]:
+        """
+        Get a list of commits for a pull request.
+
+        Parameters
+        ----------
+        number : int
+            Pull request number.
+
+        Returns
+        -------
+        list[dict]
+            A list of commits as dictionaries.
+            Commits are ordered by ascending commit date.
+
+        References
+        ----------
+        - [GitHub API Docs](https://docs.github.com/en/rest/pulls/commits?apiVersion=2022-11-28#list-commits-on-a-pull-request)
+        """
+
+        def make_query():
+            response = self.graphql_query(
+                query=f'{search_sig} {{{page_info_fields} {payload}}}',
+                variables=variables,
+            )["search"]
+            page_info = response.pop("pageInfo")
+            return page_info, response
+
+        search_args = [f'query: "{query}"', f"type: {search_type.upper()}", "after: $after", "before: $before", f"{sort}: {100 if count <= 0 else min(count, 100)}"]
+        page_info_fields = "pageInfo {startCursor, endCursor, hasNextPage, hasPreviousPage}"
+        search_sig = f"search({", ".join(search_args)})"
+        variables = {
+            "after": (cursor_after, "String", False),
+            "before": (cursor_before, "String", False),
+        }
+        page_info, data = make_query()
+        out = [data]
+        total_downloaded = 100
+        while True:
+            if count <= 0:
+                must_continue = page_info["hasNextPage" if sort == "first" else "hasPreviousPage"]
+                if not must_continue:
+                    return out
+            elif total_downloaded >= count:
+                return out
+            else:
+                variables["after" if sort == "first" else "before"] = (page_info["endCursor" if sort == "first" else "startCursor"], "String", False)
+                page_info, data = make_query()
+                out.append(data)
+                total_downloaded += 100
+
     def graphql_query(
         self,
         query: str,
@@ -690,10 +767,9 @@ class Repo:
             elif total_downloaded >= count:
                 return post_process()
             else:
-                variables[sort] = page_info["endCursor" if sort == "first" else "startCursor"]
+                variables["after" if sort == "first" else "before"] = (page_info["endCursor" if sort == "first" else "startCursor"], "String", False)
                 data.append(self._graphql_query(payload, variables))
                 total_downloaded += 100
-
         # commits = []
         # page = 1
         # while True:
