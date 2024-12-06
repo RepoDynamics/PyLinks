@@ -24,6 +24,7 @@ class WebAPIRequestError(WebAPIError):
     def __init__(self, request_error: RequestException):
         self.request = request_error.request
         self.response = request_error.response
+        self.error = request_error
         details = []
         if self.request:
             details.append(_process_request(self.request))
