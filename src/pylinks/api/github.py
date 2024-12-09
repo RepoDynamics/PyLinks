@@ -1641,13 +1641,13 @@ class Repo:
                     "bypass_mode": 'always' if always_bypass else 'pull_request'
                 } for actor_id, actor_type, always_bypass in bypass_actors
             ]
-        if ref_name_include is not None:
+        if ref_name_include is not None or ref_name_exclude is not None:
             data["conditions"] = {
-                "ref_name": {"include": ref_name_include}
+                "ref_name": {
+                    "include": ref_name_include or [],
+                    "exclude": ref_name_exclude or []
+                }
             }
-        if ref_name_exclude is not None:
-            ref_name_conditions = data.setdefault("conditions", {}).setdefault("ref_name", {})
-            ref_name_conditions["exclude"] = ref_name_exclude
         rules = []
         update_rules = False
         if creation is not None:
