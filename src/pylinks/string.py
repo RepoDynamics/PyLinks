@@ -21,7 +21,7 @@ def to_slug(string: str) -> str:
 
 
 def camel_to_title(string: str) -> str:
-    """Convert a 'CamelCase' string to a 'Title Case' string.
+    """Convert a 'camelCase' string to 'Title Case'.
 
     This function inserts spaces before each uppercase letter (except the first letter)
     and capitalizes the first letter of each word.
@@ -32,6 +32,13 @@ def camel_to_title(string: str) -> str:
     title_str = spaced_str.title()
     return title_str
 
+def camel_to_snake(camel_str):
+    """Convert a 'camelCase' case string to 'snake_case'.
+
+    This function inserts underscores before uppercase letters and lowercases them.
+    """
+    snake_str = _re.sub(r'(?<!^)(?=[A-Z])', '_', camel_str).lower()
+    return snake_str
 
 def snake_to_camel(string):
     components = string.split('_')
