@@ -2,7 +2,7 @@ import re as _re
 import unicodedata as _unicodedata
 
 
-def to_slug(string: str) -> str:
+def to_slug(string: str, reduce: bool = True) -> str:
     """Convert a string to a URL-friendly slug.
 
     This function performs unicode-normalization on the string,
@@ -17,7 +17,9 @@ def to_slug(string: str) -> str:
     # Decode back to a string
     ascii_string = ascii_bytes.decode('ascii')
     lower_case_string = ascii_string.lower()
-    return _re.sub(r'[^a-z0-9]+', '-', lower_case_string).strip('-')
+    if reduce:
+        return _re.sub(r'[^a-z0-9]+', '-', lower_case_string).strip('-')
+    return _re.sub(r'[^a-z0-9]', '-', lower_case_string)
 
 
 def camel_to_title(string: str) -> str:
