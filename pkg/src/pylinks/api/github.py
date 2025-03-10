@@ -29,6 +29,7 @@ class GitHub:
         self._token = token
         self._headers = {"X-GitHub-Api-Version": "2022-11-28"}
         if timezone:
+            # https://docs.github.com/en/rest/using-the-rest-api/timezones-and-the-rest-api?apiVersion=2022-11-28
             self._headers["Time-Zone"] = timezone
         if self._token:
             self._headers["Authorization"] = f"Bearer {self._token}"
