@@ -21,13 +21,15 @@ class GitHub:
     - [GraphQL API Documentation](https://docs.github.com/en/graphql)
     """
 
-    def __init__(self, token: Optional[str] = None):
+    def __init__(self, token: Optional[str] = None, timezone: str | None = "UTC"):
         self._endpoint = {
             "api": _pylinks.url.create("https://api.github.com"),
             "upload": _pylinks.url.create("https://uploads.github.com"),
         }
         self._token = token
         self._headers = {"X-GitHub-Api-Version": "2022-11-28"}
+        if timezone:
+            self._headers["Time-Zone"] = timezone
         if self._token:
             self._headers["Authorization"] = f"Bearer {self._token}"
         return
@@ -184,10 +186,10 @@ class GitHub:
 
 
 class User:
-    def __init__(self, username: str, token: Optional[str] = None):
+    def __init__(self, username: str, token: Optional[str] = None, timezone: str | None = "UTC"):
         self._username = username
         self._token = token
-        self._github = GitHub(token)
+        self._github = GitHub(token, timezone=timezone)
         return
 
     def _rest_query(
@@ -228,11 +230,11 @@ class User:
 
 
 class Repo:
-    def __init__(self, username: str, name: str, token: Optional[str] = None):
+    def __init__(self, username: str, name: str, token: Optional[str] = None, timezone: str | None = "UTC"):
         self._username = username
         self._name = name
         self._token = token
-        self._github = GitHub(token)
+        self._github = GitHub(token, timezone=timezone)
         return
 
     def _rest_query(

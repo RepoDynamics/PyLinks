@@ -10,8 +10,8 @@ def doi(doi: str) -> DOI:
     return DOI(doi=doi)
 
 
-def github(token: Optional[str] = None) -> GitHub:
-    return GitHub(token=token)
+def github(token: Optional[str] = None, timezone: str | None = "UTC") -> GitHub:
+    return GitHub(token=token, timezone=timezone)
 
 
 def orcid(orcid_id: str) -> Orcid:
